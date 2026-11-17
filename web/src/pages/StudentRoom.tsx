@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, CALL_LABEL, slotLabel, type CallType, type Room, type StudentQueue } from '../api'
 import { useRoomEvents } from '../app-context'
-import { ErrorText, Header, PushBanner, TypeBadge } from '../components'
-import { IconCheck, IconQuestion, IconUser } from '../icons'
+import { ErrorText, Header, IconButton, MenuSheet, PushBanner, Sheet, TypeBadge } from '../components'
+import { IconCheck, IconLeave, IconMore, IconQuestion, IconUser } from '../icons'
 import { chime, onForegroundPush } from '../push'
 
 export default function StudentRoom() {
@@ -14,6 +14,8 @@ export default function StudentRoom() {
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [sheet, setSheet] = useState<'menu' | 'leave' | null>(null)
+  const nav = useNavigate()
 
   const load = useCallback(async () => {
     try {
@@ -38,6 +40,16 @@ export default function StudentRoom() {
     try { await api.cancelCall(id); await load() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
 
+  // 間違えて別のクラスに入ったとき用。呼び出し中なら取り消される
+  const leave = async () => {
+    setError('')
+    setBusy(true)
+    try {
+      await api.leaveRoom(id)
+      nav('/', { replace: true })
+    } catch (e) { setError((e as Error).message); setSheet(null) } finally { setBusy(false) }
+  }
+
   const open = queue?.isOpen ?? false
   const waiting = !!queue?.myType
   const first = waiting && queue!.position === 1
@@ -50,7 +62,10 @@ export default function StudentRoom() {
         title={room?.subject ?? '授業'}
         sub={room ? `${room.className}・${slotLabel(room)}・${room.ownerName}` : undefined}
         back={queue && !queue.isOpen ? '/' : undefined}
-        actions={<Link to="/account" className="icon-btn" aria-label="プロフィール" title="プロフィール"><IconUser /></Link>}
+        actions={<>
+          <Link to="/account" className="icon-btn" aria-label="プロフィール" title="プロフィール"><IconUser /></Link>
+          <IconButton label="その他の操作" onClick={() => setSheet('menu')}><IconMore /></IconButton>
+        </>}
       />
       <main className="page stack with-actionbar tall">
         <PushBanner text="自分の番が近づいたら通知を受け取る" />
@@ -107,6 +122,27 @@ export default function StudentRoom() {
           </div>
         )}
       </div>
+
+      {sheet === 'menu' && (
+        <MenuSheet onClose={() => setSheet(null)} items={[
+          { label: 'この授業から抜ける', icon: <IconLeave />, danger: true, onSelect: () => setSheet('leave') },
+        ]} />
+      )}
+      {sheet === 'leave' && (
+        <Sheet title="この授業から抜けますか?" onClose={() => setSheet(null)}>
+          <div className="stack">
+            <p>「{room?.subject ?? 'この授業'}」{room && `(${room.className}・${slotLabel(room)})`}から抜けます。間違えて別のクラスに参加したときに使ってください。</p>
+            <ul className="bullets">
+              {waiting && <li>今の呼び出しは取り消されます</li>}
+              <li>もう一度参加するには、先生の QR コードを読み取ります</li>
+            </ul>
+            <div className="row">
+              <button type="button" className="btn" onClick={() => setSheet(null)}>キャンセル</button>
+              <button type="button" className="btn danger" disabled={busy} onClick={() => void leave()}>抜ける</button>
+            </div>
+          </div>
+        </Sheet>
+      )}
     </>
   )
 }

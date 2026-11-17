@@ -90,6 +90,11 @@ func (r *Room) LastPeriod() int {
 	return r.PeriodEnd
 }
 
+// 同じ曜日で、時限が1コマでも重なっていれば同じ時間帯
+func (r *Room) Overlaps(o *Room) bool {
+	return r.DayOfWeek == o.DayOfWeek && r.Period <= o.LastPeriod() && o.Period <= r.LastPeriod()
+}
+
 var allModels = []any{&User{}, &Room{}, &Enrollment{}, &Call{}, &Memo{}, &PushSubscription{}}
 
 // ---------- レスポンス用 ----------

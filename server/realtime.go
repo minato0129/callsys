@@ -224,7 +224,7 @@ type roomNotifyState struct {
 	ack    bool
 	timer  *time.Timer // 再通知
 	first  *time.Timer // 最初の通知(呼び出されてから待ち時間のあと)
-	headID int64 // 今の先頭の呼び出し。入れ替わったら新しい先頭の学生に知らせる
+	headID int64       // 今の先頭の呼び出し。入れ替わったら新しい先頭の学生に知らせる
 }
 
 type Notifier struct {

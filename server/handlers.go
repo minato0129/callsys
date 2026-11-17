@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -49,6 +50,7 @@ func (app *App) routes(e *echo.Echo) {
 
 	// 学生
 	api.POST("/join", app.handleJoin, login, student)
+	api.DELETE("/rooms/:id/enrollment", app.handleLeave, login, student)
 	api.GET("/my/rooms", app.handleMyRooms, login, student)
 	api.POST("/rooms/:id/calls", app.handleCreateCall, login, student)
 	api.DELETE("/rooms/:id/calls/mine", app.handleCancelCall, login, student)
@@ -453,9 +455,13 @@ func (app *App) handleQueue(c echo.Context) error {
 
 // ---------- student ----------
 
+// POST /api/join QR から授業に参加する。
+// 同じ時間帯(同じ曜日で時限が重なる)の別の授業には参加できない。そのときは 409 で、参加中の授業を返す。
+// replace: true なら、その授業を抜けてから参加する(間違えて別のクラスに入ったとき用)
 func (app *App) handleJoin(c echo.Context) error {
 	var in struct {
-		RoomID string `json:"roomId"`
+		RoomID  string `json:"roomId"`
+		Replace bool   `json:"replace"`
 	}
 	if err := c.Bind(&in); err != nil || in.RoomID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "QRコードが不正です")
@@ -467,10 +473,60 @@ func (app *App) handleJoin(c echo.Context) error {
 	} else if err != nil {
 		return err
 	}
-	if err := app.store.Enroll(ctx, room.ID, currentUser(c).ID); err != nil {
+	u := currentUser(c)
+	enrolled, err := app.store.ListEnrolledRooms(ctx, u.ID)
+	if err != nil {
+		return err
+	}
+	var conflicts []*Room
+	for _, r := range enrolled {
+		if r.ID == room.ID {
+			return c.JSON(http.StatusOK, app.withOpen(room)) // 参加済み
+		}
+		if r.Overlaps(room) {
+			conflicts = append(conflicts, r)
+		}
+	}
+	if len(conflicts) > 0 && !in.Replace {
+		return c.JSON(http.StatusConflict, map[string]any{
+			"error":    "同じ時間帯の授業「" + conflicts[0].Subject + "」に参加しています",
+			"conflict": conflicts[0],
+			"room":     room,
+		})
+	}
+	for _, r := range conflicts {
+		if err := app.leave(ctx, r.ID, u.ID); err != nil {
+			return err
+		}
+	}
+	if err := app.store.Enroll(ctx, room.ID, u.ID); err != nil {
 		return err
 	}
 	return c.JSON(http.StatusOK, app.withOpen(room))
+}
+
+// DELETE /api/rooms/:id/enrollment 学生が授業から抜ける(間違えて別のクラスに入ったとき用)。
+// 呼び出し中なら取り消す。メモは先生の記録なので残す。もう一度参加するには QR を読み取る
+func (app *App) handleLeave(c echo.Context) error {
+	room, err := app.memberRoom(c)
+	if err != nil {
+		return err
+	}
+	if err := app.leave(c.Request().Context(), room.ID, currentUser(c).ID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (app *App) leave(ctx context.Context, roomID, userID string) error {
+	cancelled, err := app.store.Unenroll(ctx, roomID, userID)
+	if err != nil {
+		return err
+	}
+	if cancelled {
+		app.notifier.QueueChanged(roomID, reasonCancelled)
+	}
+	return nil
 }
 
 // 受講中のルーム一覧と、今開いているルーム

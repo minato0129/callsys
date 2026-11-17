@@ -295,6 +295,22 @@ func (s *Store) IsEnrolled(ctx context.Context, roomID, userID string) (bool, er
 	return n > 0, err
 }
 
+// 授業から抜ける。待っている呼び出しは取り消す(取り消したら true)
+func (s *Store) Unenroll(ctx context.Context, roomID, userID string) (bool, error) {
+	cancelled := false
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&Call{}).
+			Where("room_id = ? AND student_id = ? AND status = ?", roomID, userID, "WAITING").
+			Updates(map[string]any{"status": "CANCELLED", "resolved_at": now()})
+		if res.Error != nil {
+			return res.Error
+		}
+		cancelled = res.RowsAffected > 0
+		return tx.Where("room_id = ? AND user_id = ?", roomID, userID).Delete(&Enrollment{}).Error
+	})
+	return cancelled, err
+}
+
 // ---------- calls ----------
 
 // 待機中の呼び出しを順番(id 昇順)で返す
