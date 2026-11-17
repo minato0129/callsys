@@ -14,7 +14,7 @@ export default function StudentRoom() {
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
-  const [sheet, setSheet] = useState<'menu' | 'leave' | null>(null)
+  const [sheet, setSheet] = useState<'menu' | 'leave' | 'cancel' | null>(null)
   const nav = useNavigate()
 
   const load = useCallback(async () => {
@@ -37,7 +37,7 @@ export default function StudentRoom() {
   const cancel = async () => {
     setError('')
     setBusy(true)
-    try { await api.cancelCall(id); await load() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+    try { await api.cancelCall(id); await load() } catch (e) { setError((e as Error).message) } finally { setBusy(false); setSheet(null) }
   }
 
   // 間違えて別のクラスに入ったとき用。呼び出し中なら取り消される
@@ -107,7 +107,7 @@ export default function StudentRoom() {
       {/* 親指が届く画面の下に、呼び出しのボタンを置く */}
       <div className="actionbar">
         {waiting ? (
-          <button type="button" className="btn wide large danger-outline" disabled={busy} onClick={() => void cancel()}>
+          <button type="button" className="btn wide large danger-outline" disabled={busy} onClick={() => setSheet('cancel')}>
             呼び出しを取り消す
           </button>
         ) : (
@@ -127,6 +127,22 @@ export default function StudentRoom() {
         <MenuSheet onClose={() => setSheet(null)} items={[
           { label: 'この授業から抜ける', icon: <IconLeave />, danger: true, onSelect: () => setSheet('leave') },
         ]} />
+      )}
+      {/* 取り消す前に確認する。先生に対応してもらったあとは、先生が「対応済」にするので取り消さない */}
+      {sheet === 'cancel' && (
+        <Sheet title="呼び出しを取り消しますか?" onClose={() => setSheet(null)}>
+          <div className="stack">
+            <div className="callout">
+              <p className="callout-title">先生に対応してもらった場合は、取り消さないでください</p>
+              <p>対応が終わったら、先生が「対応済」にします。取り消すと、先生のメモが残らなくなります。</p>
+            </div>
+            <p className="muted">質問が解決した・呼び出す必要がなくなったときだけ取り消してください。取り消すと列から外れ、もう一度呼び出すと最後に並びます。</p>
+            <div className="row">
+              <button type="button" className="btn large" onClick={() => setSheet(null)}>取り消さない</button>
+              <button type="button" className="btn large danger" disabled={busy} onClick={() => void cancel()}>取り消す</button>
+            </div>
+          </div>
+        </Sheet>
       )}
       {sheet === 'leave' && (
         <Sheet title="この授業から抜けますか?" onClose={() => setSheet(null)}>
