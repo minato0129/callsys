@@ -194,6 +194,9 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
 .join-room.highlight .join-room-label { color: var(--board); }
 .join-room-title { font-weight: 900; font-size: 1.1rem; }
 .join-room-sub { font-size: .85rem; color: var(--muted); }
+/* 注意書き(チョークの黄色の帯) */
+.callout { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: var(--radius); border-left: 5px solid var(--chalk); background: color-mix(in srgb, var(--chalk) 18%, var(--surface)); font-size: .92rem; }
+.callout-title { font-weight: 900; color: var(--ink); }
 .bullets { margin: 0; padding-left: 1.2em; list-style: disc; display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: .92rem; }
 
 .empty { padding: 32px 8px; text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 12px; }
