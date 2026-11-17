@@ -18,6 +18,9 @@
   --question-soft: #e0e9f6;
   --check: #b0562a;
   --check-soft: #f6e4da;
+  /* 先生のルームの先頭カード(黒板)の色。質問は青、課題チェックはレンガ色にして、ひと目で分かるように */
+  --board-question: #1f4677;
+  --board-check: #7f3a17;
   --danger: #b3261e;
   --tab-h: 64px;
   --radius-lg: 22px;
@@ -32,6 +35,7 @@
     --paper: #101614; --surface: #19211e; --ink: #e8eeea; --muted: #9aa7a0; --line: #2a3530;
     --board: #2f7a63; --board-ink: #f3f6f2; --board-soft: #1f322b;
     --question: #7fb0ec; --question-soft: #1c2a3a; --check: #e59a6a; --check-soft: #3a281d;
+    --board-question: #1d3b63; --board-check: #6a3216;
     --danger: #ff8a80;
     color-scheme: dark;
   }
@@ -270,20 +274,35 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
 .board-name { font-size: 2rem; font-weight: 900; line-height: 1.25; letter-spacing: .02em; overflow-wrap: anywhere; }
 .board-memo { font-size: .9rem; opacity: .85; border-left: 3px solid rgb(255 255 255 / .35); padding-left: 10px; white-space: pre-wrap; }
 .btn.board-btn { min-height: 56px; margin-top: 4px; background: var(--chalk); border-color: var(--chalk); color: var(--chalk-ink); font-size: 1.1rem; }
+/* 種類で黒板の色を変え、種類の名前も大きく出す */
+.board.question { background: var(--board-question); }
+.board.check { background: var(--board-check); }
+.board-type {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 99px;
+  background: #fff; font-weight: 900; font-size: 1rem; line-height: 1.5; white-space: nowrap;
+}
+.board.question .board-type { color: var(--board-question); }
+.board.check .board-type { color: var(--board-check); }
+.board-type svg { width: 16px; height: 16px; }
 .empty-board { min-height: 160px; justify-content: center; align-items: center; text-align: center; background: var(--surface); color: var(--muted); border: 1px dashed var(--line); }
 
 .next-row {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 8px 14px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); text-align: left; cursor: pointer;
 }
+.next-row.question { border-left: 6px solid var(--question); }
+.next-row.check { border-left: 6px solid var(--check); }
 .next-label { font-size: .78rem; font-weight: 800; color: var(--muted); }
 .next-name { font-weight: 800; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .next-time { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-.stats { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.stats { display: grid; grid-template-columns: 1fr .9fr 1.3fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .stats > div { background: var(--surface); padding: 10px 14px; }
-.stats dt { font-size: .75rem; color: var(--muted); font-weight: 600; }
+.stats dt { font-size: .75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .stats dd { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.stats dt.question, .stats dd.question { color: var(--question); }
+.stats dt.check, .stats dd.check { color: var(--check); }
+.stats dt.question::before, .stats dt.check::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: 1px; }
 
 /* PC だけ: 横に出しておく参加用の QR */
 .qr-card { flex-direction: column; gap: 12px; align-items: center; text-align: center; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
