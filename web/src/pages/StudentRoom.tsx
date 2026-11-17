@@ -134,9 +134,9 @@ export default function StudentRoom() {
           <div className="stack">
             <div className="callout">
               <p className="callout-title">先生に対応してもらった場合は、取り消さないでください</p>
-              <p>対応が終わったら、先生が「対応済」にします。取り消すと、先生のメモが残らなくなります。</p>
+              <p>対応が終わったら、先生が「対応済」にします。</p>
             </div>
-            <p className="muted">質問が解決した・呼び出す必要がなくなったときだけ取り消してください。取り消すと列から外れ、もう一度呼び出すと最後に並びます。</p>
+            <p className="muted">質問が解決した・呼び出す必要がなくなったときだけ取り消してください。</p>
             <div className="row">
               <button type="button" className="btn large" onClick={() => setSheet(null)}>取り消さない</button>
               <button type="button" className="btn large danger" disabled={busy} onClick={() => void cancel()}>取り消す</button>
