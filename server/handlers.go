@@ -85,6 +85,7 @@ func errorHandler(err error, c echo.Context) {
 
 func (app *App) withOpen(r *Room) *Room {
 	r.PeriodEnd = r.LastPeriod() // 古いルーム(0)も、レスポンスでは終了時限を入れて返す
+	r.Slots = r.TimeSlots()      // 時間帯の表を読み込んでいないときも、1つの時間帯として返す
 	r.IsOpen = app.cfg.roomOpen(r, time.Now())
 	return r
 }
@@ -158,12 +159,7 @@ func (app *App) handleListRooms(c echo.Context) error {
 
 // 授業中のルームを一番上に、それ以外は月曜1限から順に並べる(日曜は最後)
 func sortRooms(rooms []*Room) {
-	weekday := func(dow int) int {
-		if dow == 0 {
-			return 7 // 日曜は土曜のあと
-		}
-		return dow
-	}
+	weekday := weekdayOrder // 日曜は土曜のあと
 	sort.SliceStable(rooms, func(i, j int) bool {
 		a, b := rooms[i], rooms[j]
 		if a.IsOpen != b.IsOpen {
@@ -179,13 +175,22 @@ func sortRooms(rooms []*Room) {
 	})
 }
 
+type slotInput struct {
+	DayOfWeek int `json:"dayOfWeek"`
+	Period    int `json:"period"`    // 開始時限
+	PeriodEnd int `json:"periodEnd"` // 終了時限。省略(0)なら開始時限と同じ
+}
+
 type roomInput struct {
 	Subject   string `json:"subject"`
 	ClassName string `json:"className"`
-	DayOfWeek int    `json:"dayOfWeek"`
-	Period    int    `json:"period"`    // 開始時限
-	PeriodEnd int    `json:"periodEnd"` // 終了時限。省略(0)なら開始時限と同じ
+	// 授業の時間帯。曜日をまたぐ授業は複数。省略したときは下の dayOfWeek / period / periodEnd を1つの時間帯として使う(以前の形)
+	Slots []slotInput `json:"slots"`
+	slotInput
 }
+
+// 1つのルームに登録できる時間帯の数
+const maxSlots = 10
 
 // 入力を検証して Room の項目に反映する
 func (app *App) applyRoomInput(c echo.Context, r *Room) error {
@@ -194,21 +199,42 @@ func (app *App) applyRoomInput(c echo.Context, r *Room) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "入力が不正です")
 	}
 	in.Subject, in.ClassName = strings.TrimSpace(in.Subject), normalizeClassNames(in.ClassName)
-	if in.PeriodEnd == 0 {
-		in.PeriodEnd = in.Period
+	if len(in.Slots) == 0 {
+		in.Slots = []slotInput{in.slotInput}
 	}
-	_, okStart := app.cfg.period(in.Period)
-	_, okEnd := app.cfg.period(in.PeriodEnd)
-	if in.Subject == "" || in.ClassName == "" || in.DayOfWeek < 0 || in.DayOfWeek > 6 || !okStart || !okEnd {
+	if in.Subject == "" || in.ClassName == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "科目名・クラス名・曜日・時限を正しく入力してください")
 	}
-	if in.PeriodEnd < in.Period {
-		return echo.NewHTTPError(http.StatusBadRequest, "終了の時限は開始の時限以降にしてください")
+	if len(in.Slots) > maxSlots {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("時間帯は %d 個までです", maxSlots))
+	}
+	slots := make([]RoomSlot, 0, len(in.Slots))
+	for _, s := range in.Slots {
+		if s.PeriodEnd == 0 {
+			s.PeriodEnd = s.Period
+		}
+		_, okStart := app.cfg.period(s.Period)
+		_, okEnd := app.cfg.period(s.PeriodEnd)
+		if s.DayOfWeek < 0 || s.DayOfWeek > 6 || !okStart || !okEnd {
+			return echo.NewHTTPError(http.StatusBadRequest, "科目名・クラス名・曜日・時限を正しく入力してください")
+		}
+		if s.PeriodEnd < s.Period {
+			return echo.NewHTTPError(http.StatusBadRequest, "終了の時限は開始の時限以降にしてください")
+		}
+		slot := RoomSlot{DayOfWeek: s.DayOfWeek, Period: s.Period, PeriodEnd: s.PeriodEnd}
+		for _, o := range slots {
+			if slot.Overlaps(o) {
+				return echo.NewHTTPError(http.StatusBadRequest,
+					fmt.Sprintf("時間帯が重なっています(%s と %s)", slotLabel(o.DayOfWeek, o.Period, o.LastPeriod()), slotLabel(slot.DayOfWeek, slot.Period, slot.LastPeriod())))
+			}
+		}
+		slots = append(slots, slot)
 	}
 	if len(in.ClassName) > 255 || len(in.Subject) > 255 {
 		return echo.NewHTTPError(http.StatusBadRequest, "科目名・クラス名が長すぎます")
 	}
-	r.Subject, r.ClassName, r.DayOfWeek, r.Period, r.PeriodEnd = in.Subject, in.ClassName, in.DayOfWeek, in.Period, in.PeriodEnd
+	r.Subject, r.ClassName = in.Subject, in.ClassName
+	r.SetSlots(slots)
 	return nil
 }
 
@@ -233,9 +259,18 @@ func slotTakenError(err error) error {
 	if errors.As(err, &st) {
 		o := st.Room
 		return echo.NewHTTPError(http.StatusConflict,
-			fmt.Sprintf("時間が重なるルームがあります(%s: %s)", slotLabel(o.DayOfWeek, o.Period, o.LastPeriod()), o.Subject))
+			fmt.Sprintf("時間が重なるルームがあります(%s: %s)", roomSlotsLabel(o), o.Subject))
 	}
 	return echo.NewHTTPError(http.StatusConflict, "時間が重なるルームがあります")
+}
+
+// ルームの時間帯をすべて並べる(例: 「月曜 1〜2限、木曜 3限」)
+func roomSlotsLabel(r *Room) string {
+	var labels []string
+	for _, s := range r.TimeSlots() {
+		labels = append(labels, slotLabel(s.DayOfWeek, s.Period, s.LastPeriod()))
+	}
+	return strings.Join(labels, "、")
 }
 
 func slotLabel(dow, first, last int) string {
@@ -339,7 +374,7 @@ func (app *App) handleCloseRoom(c echo.Context) error {
 	}
 	ctx := c.Request().Context()
 	var closedUntil *time.Time
-	if end, ok := app.cfg.scheduledEnd(room.DayOfWeek, room.Period, room.LastPeriod(), time.Now()); ok {
+	if end, ok := app.cfg.roomScheduledEnd(room, time.Now()); ok {
 		closedUntil = &end
 	}
 	if err := app.store.SetManualState(ctx, room.ID, nil, closedUntil); err != nil {

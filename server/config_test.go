@@ -71,3 +71,38 @@ func TestLastPeriod(t *testing.T) {
 		}
 	}
 }
+
+func TestRoomOpenMultiSlots(t *testing.T) {
+	c := testConfig(t)
+	r := &Room{}
+	r.SetSlots([]RoomSlot{{DayOfWeek: 1, Period: 1, PeriodEnd: 2}, {DayOfWeek: 4, Period: 3, PeriodEnd: 3}}) // 月1〜2限・木3限
+	at := func(s string) time.Time {
+		tm, err := time.ParseInLocation("2006-01-02 15:04", s, c.Loc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tm
+	}
+	// 2026-11-16 は月曜、2026-11-19 は木曜
+	cases := []struct {
+		at   string
+		want bool
+	}{
+		{"2026-11-16 09:30", true},  // 月1限
+		{"2026-11-16 12:00", true},  // 月2限
+		{"2026-11-16 13:45", false}, // 月3限(時間帯の外)
+		{"2026-11-19 10:00", false}, // 木1限(時間帯の外)
+		{"2026-11-19 14:00", true},  // 木3限
+		{"2026-11-17 14:00", false}, // 火曜
+	}
+	for _, cs := range cases {
+		if got := c.roomOpen(r, at(cs.at)); got != cs.want {
+			t.Errorf("roomOpen(%s) = %v, want %v", cs.at, got, cs.want)
+		}
+	}
+	// 「授業を終了」で閉じておく時刻は、今の時間帯の終わり
+	end, ok := c.roomScheduledEnd(r, at("2026-11-19 14:00"))
+	if !ok || !end.Equal(at("2026-11-19 15:00").UTC()) {
+		t.Errorf("roomScheduledEnd = %v %v, want 15:00", end.In(c.Loc), ok)
+	}
+}

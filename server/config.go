@@ -220,7 +220,22 @@ func (c *Config) roomOpen(r *Room, now time.Time) bool {
 	if r.OpenUntil != nil && now.Before(*r.OpenUntil) {
 		return true
 	}
-	return c.scheduledOpen(r.DayOfWeek, r.Period, r.LastPeriod(), now)
+	for _, s := range r.TimeSlots() {
+		if c.scheduledOpen(s.DayOfWeek, s.Period, s.LastPeriod(), now) {
+			return true
+		}
+	}
+	return false
+}
+
+// 今が時間割上の授業中(どれかの時間帯の中)なら、その時間帯の最後の時限の終了時刻を返す
+func (c *Config) roomScheduledEnd(r *Room, now time.Time) (time.Time, bool) {
+	for _, s := range r.TimeSlots() {
+		if end, ok := c.scheduledEnd(s.DayOfWeek, s.Period, s.LastPeriod(), now); ok {
+			return end, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // 授業日(JST の "YYYY-MM-DD")。メモはこの日付ごとに1枚

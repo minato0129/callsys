@@ -215,7 +215,10 @@ export default function TeacherRoom() {
         <Sheet title="ルームを変更" onClose={closeSheet}>
           <p className="hint">メモ・参加している学生・QR コードはそのまま引き継がれます。</p>
           <RoomForm
-            initial={{ subject: room.subject, className: room.className, dayOfWeek: room.dayOfWeek, period: room.period, periodEnd: room.periodEnd }}
+            initial={{
+              subject: room.subject, className: room.className,
+              slots: room.slots?.length ? room.slots : [{ dayOfWeek: room.dayOfWeek, period: room.period, periodEnd: room.periodEnd }],
+            }}
             submitLabel="保存"
             onCancel={closeSheet}
             onSubmit={async (v) => {
