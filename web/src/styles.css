@@ -60,6 +60,13 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .page.with-actionbar.tall { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
 .stack { display: flex; flex-direction: column; gap: 14px; }
 .row { display: flex; gap: 10px; }
+/* ルームのフォーム: クラス名(合同授業は複数) */
+.class-fields { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.class-fields legend { padding: 0; margin-bottom: 6px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+.class-field { display: flex; align-items: center; gap: 6px; }
+.class-field input { flex: 1; min-width: 0; }
+.btn.add-class { align-self: flex-start; gap: 6px; }
+.btn.add-class svg { width: 18px; height: 18px; }
 .row > * { flex: 1; }
 .muted { color: var(--muted); }
 .center { text-align: center; }
