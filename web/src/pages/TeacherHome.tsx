@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, slotLabel, type Room } from '../api'
+import { api, slotLabel, slotLabels, type Room } from '../api'
 import { RoomForm } from '../RoomForm'
 import { useApp } from '../app-context'
 import { ErrorText, Header, IconButton, PushBanner, Sheet, TabBar } from '../components'
@@ -43,7 +43,7 @@ export default function TeacherHome() {
             {rest.map((r) => (
               <li key={r.id}>
                 <Link to={`/rooms/${r.id}`} className="list-row">
-                  <span className="slot">{slotLabel(r)}</span>
+                  <span className="slot">{slotLabels(r).map((l) => <span key={l}>{l}</span>)}</span>
                   <span className="list-main">
                     <span className="list-title">{r.subject}</span>
                     <span className="list-sub">{r.className}</span>
@@ -67,7 +67,7 @@ export default function TeacherHome() {
       {creating && (
         <Sheet title="ルームを作成" onClose={() => setCreating(false)}>
           <RoomForm
-            initial={{ subject: '', className: '', dayOfWeek: 1, period: 1, periodEnd: 1 }}
+            initial={{ subject: '', className: '', slots: [{ dayOfWeek: 1, period: 1, periodEnd: 1 }] }}
             submitLabel="作成"
             onCancel={() => setCreating(false)}
             onSubmit={async (v) => {

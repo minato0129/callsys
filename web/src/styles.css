@@ -65,6 +65,12 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .class-fields legend { padding: 0; margin-bottom: 6px; font-size: .85rem; font-weight: 600; color: var(--muted); }
 .class-field { display: flex; align-items: center; gap: 6px; }
 .class-field input { flex: 1; min-width: 0; }
+.class-fields legend, .slot-fields legend { padding: 0; margin-bottom: 6px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+/* 時間帯(曜日・開始・終了)。曜日をまたぐ授業は複数 */
+.slot-fields { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.slot-field { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: color-mix(in srgb, var(--paper) 50%, var(--surface)); }
+.slot-field-head { display: flex; align-items: flex-end; gap: 6px; }
+.slot-field-head label { flex: 1; }
 .btn.add-class { align-self: flex-start; gap: 6px; }
 .btn.add-class svg { width: 18px; height: 18px; }
 .row > * { flex: 1; }
@@ -199,10 +205,11 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
 .list-row { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 10px 16px; }
 .list-row:active { background: var(--paper); }
 .slot {
-  flex: none; width: 72px; font-size: .8rem; font-weight: 700; color: var(--board); line-height: 1.35;
+  flex: none; width: 84px; font-size: .8rem; font-weight: 700; color: var(--board); line-height: 1.35;
   font-variant-numeric: tabular-nums;
 }
 @media (prefers-color-scheme: dark) { .slot { color: var(--board-ink); } }
+.slot > span { display: block; white-space: nowrap; } /* 曜日をまたぐ授業は時間帯を1行ずつ */
 .list-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .list-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .list-sub { font-size: .82rem; color: var(--muted); }

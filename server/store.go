@@ -54,6 +54,12 @@ func openStore(dsn string) (*Store, error) {
 	if err := db.AutoMigrate(allModels...); err != nil {
 		return nil, err
 	}
+	// 時間帯の表がなかったころのルームは、ルームの曜日・時限を1つ目の時間帯として登録する
+	if err := db.Exec(`INSERT INTO room_slots (room_id, day_of_week, period, period_end)
+		SELECT r.id, r.day_of_week, r.period, GREATEST(r.period_end, r.period) FROM rooms r
+		WHERE NOT EXISTS (SELECT 1 FROM room_slots s WHERE s.room_id = r.id)`).Error; err != nil {
+		return nil, fmt.Errorf("時間帯の移行: %w", err)
+	}
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxOpenConns(20)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
@@ -191,17 +197,21 @@ func fillOwner(rooms []Room) []*Room {
 	return out
 }
 
-// 同じ先生・同じ曜日で、時限の範囲が重なるルームを探す(exceptID は自分自身を除くため)
+// 時間帯は月曜1限から順に読み込む
+func preloadSlots(db *gorm.DB) *gorm.DB {
+	return db.Order("CASE WHEN day_of_week = 0 THEN 7 ELSE day_of_week END, period")
+}
+
+// 同じ先生のルームで、どれかの時間帯が重なるものを探す(exceptID は自分自身を除くため)
 func overlappingRoom(tx *gorm.DB, r *Room, exceptID string) (*Room, error) {
 	var rooms []Room
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("owner_id = ? AND day_of_week = ? AND id <> ?", r.OwnerID, r.DayOfWeek, exceptID).
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Slots", preloadSlots).
+		Where("owner_id = ? AND id <> ?", r.OwnerID, exceptID).
 		Find(&rooms).Error; err != nil {
 		return nil, err
 	}
 	for i := range rooms {
-		o := &rooms[i]
-		if r.Period <= o.LastPeriod() && o.Period <= r.LastPeriod() {
+		if o := &rooms[i]; r.Overlaps(o) {
 			return o, nil
 		}
 	}
@@ -244,14 +254,20 @@ func (s *Store) UpdateRoom(ctx context.Context, r *Room) error {
 		}).Error
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return ErrSlotTaken
+		} else if err != nil {
+			return err
 		}
-		return err
+		// 時間帯は入れ替える
+		if err := tx.Where("room_id = ?", r.ID).Delete(&RoomSlot{}).Error; err != nil {
+			return err
+		}
+		return tx.Create(&r.Slots).Error
 	})
 }
 
 func (s *Store) GetRoom(ctx context.Context, id string) (*Room, error) {
 	var r Room
-	if err := s.db.WithContext(ctx).Preload("Owner").First(&r, "id = ?", id).Error; err != nil {
+	if err := s.db.WithContext(ctx).Preload("Owner").Preload("Slots", preloadSlots).First(&r, "id = ?", id).Error; err != nil {
 		return nil, notFound(err)
 	}
 	r.OwnerName = r.Owner.Name
@@ -260,14 +276,14 @@ func (s *Store) GetRoom(ctx context.Context, id string) (*Room, error) {
 
 func (s *Store) ListRoomsByOwner(ctx context.Context, ownerID string) ([]*Room, error) {
 	var rooms []Room
-	err := s.db.WithContext(ctx).Preload("Owner").
+	err := s.db.WithContext(ctx).Preload("Owner").Preload("Slots", preloadSlots).
 		Where("owner_id = ?", ownerID).Order("day_of_week, period").Find(&rooms).Error
 	return fillOwner(rooms), err
 }
 
 func (s *Store) ListEnrolledRooms(ctx context.Context, userID string) ([]*Room, error) {
 	var rooms []Room
-	err := s.db.WithContext(ctx).Preload("Owner").
+	err := s.db.WithContext(ctx).Preload("Owner").Preload("Slots", preloadSlots).
 		Joins("JOIN enrollments e ON e.room_id = rooms.id").
 		Where("e.user_id = ?", userID).Order("rooms.day_of_week, rooms.period").Find(&rooms).Error
 	return fillOwner(rooms), err

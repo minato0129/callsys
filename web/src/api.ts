@@ -20,6 +20,8 @@ export interface Room {
   dayOfWeek: number
   period: number    // 開始時限
   periodEnd: number // 終了時限(1コマなら period と同じ)
+  // 授業の時間帯(月曜1限から順)。曜日をまたぐ授業は複数。dayOfWeek / period / periodEnd は先頭の時間帯と同じ
+  slots: Slot[]
   createdAt: string
   isOpen: boolean
   openUntil: string | null
@@ -118,9 +120,21 @@ export const CALL_LABEL: Record<CallType, string> = { QUESTION: '質問', CHECK:
 // 参加しようとした授業と同じ時間帯の授業に、すでに参加しているとき(409)
 export interface JoinConflict { error: string; conflict: Room; room: Room }
 
-export interface RoomInput { subject: string; className: string; dayOfWeek: number; period: number; periodEnd: number }
+export interface Slot { dayOfWeek: number; period: number; periodEnd: number }
+export interface RoomInput { subject: string; className: string; slots: Slot[] }
 
-export function slotLabel(r: Pick<Room, 'dayOfWeek' | 'period'> & { periodEnd?: number }) {
-  const end = r.periodEnd && r.periodEnd > r.period ? r.periodEnd : r.period
-  return end === r.period ? `${DAYS[r.dayOfWeek]}曜 ${r.period}限` : `${DAYS[r.dayOfWeek]}曜 ${r.period}〜${end}限`
+// 1つの時間帯(例: 「火曜 3〜4限」)
+function oneSlotLabel(s: { dayOfWeek: number; period: number; periodEnd?: number }) {
+  const end = s.periodEnd && s.periodEnd > s.period ? s.periodEnd : s.period
+  return end === s.period ? `${DAYS[s.dayOfWeek]}曜 ${s.period}限` : `${DAYS[s.dayOfWeek]}曜 ${s.period}〜${end}限`
+}
+
+// ルームの時間帯を1つずつ(一覧で1行に1つ出すとき)
+export function slotLabels(r: Pick<Room, 'dayOfWeek' | 'period'> & { periodEnd?: number; slots?: Slot[] }) {
+  return r.slots?.length ? r.slots.map(oneSlotLabel) : [oneSlotLabel(r)]
+}
+
+// ルームの時間帯をすべて並べる(例: 「月曜 1〜2限、木曜 3限」)
+export function slotLabel(r: Pick<Room, 'dayOfWeek' | 'period'> & { periodEnd?: number; slots?: Slot[] }) {
+  return r.slots?.length ? r.slots.map(oneSlotLabel).join('、') : oneSlotLabel(r)
 }

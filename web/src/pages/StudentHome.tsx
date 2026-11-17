@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { api, slotLabel, type Room } from '../api'
+import { api, slotLabels, type Room } from '../api'
 import { useApp } from '../app-context'
 import { ErrorText, Header, InstallCard, PushBanner } from '../components'
 import { IconScan, IconUser } from '../icons'
@@ -46,7 +46,7 @@ export default function StudentHome() {
               {data.rooms.map((r) => (
                 <li key={r.id}>
                   <Link to={`/rooms/${r.id}`} className="list-row">
-                    <span className="slot">{slotLabel(r)}</span>
+                    <span className="slot">{slotLabels(r).map((l) => <span key={l}>{l}</span>)}</span>
                     <span className="list-main">
                       <span className="list-title">{r.subject}</span>
                       <span className="list-sub">{r.className}・{r.ownerName}</span>

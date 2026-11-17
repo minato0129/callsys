@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"sort"
+	"time"
+)
 
 // テーブル定義は GORM の AutoMigrate で作る(起動時に自動)。
 // 時刻はすべて UTC で保存し、表示時に JST へ変換する。
@@ -19,11 +22,14 @@ type Room struct {
 	Owner     User   `gorm:"foreignKey:OwnerID" json:"-"`
 	Subject   string `gorm:"size:255;not null" json:"subject"`
 	ClassName string `gorm:"size:255;not null" json:"className"`
-	DayOfWeek int    `gorm:"type:tinyint;not null;uniqueIndex:uq_owner_slot,priority:2" json:"dayOfWeek"` // 0=日 … 6=土
-	Period    int    `gorm:"type:tinyint;not null;uniqueIndex:uq_owner_slot,priority:3" json:"period"`    // 開始時限
+	// 最初の時間帯(Slots の先頭と同じ)。並び順と、以前の API との互換のために持っておく
+	DayOfWeek int `gorm:"type:tinyint;not null;uniqueIndex:uq_owner_slot,priority:2" json:"dayOfWeek"` // 0=日 … 6=土
+	Period    int `gorm:"type:tinyint;not null;uniqueIndex:uq_owner_slot,priority:3" json:"period"`    // 開始時限
 	// 終了時限(連続した複数コマのとき)。0 や Period より小さい値は 1 コマ(= Period)として扱う
-	PeriodEnd int       `gorm:"type:tinyint;not null;default:0" json:"periodEnd"`
-	CreatedAt time.Time `gorm:"type:datetime(3)" json:"createdAt"`
+	PeriodEnd int `gorm:"type:tinyint;not null;default:0" json:"periodEnd"`
+	// 授業の時間帯。曜日をまたぐ授業(例: 月曜1〜2限と木曜3限)は複数になる
+	Slots     []RoomSlot `gorm:"constraint:OnDelete:CASCADE" json:"slots"`
+	CreatedAt time.Time  `gorm:"type:datetime(3)" json:"createdAt"`
 
 	// 先生の手動操作。時間割より優先される
 	OpenUntil   *time.Time `gorm:"type:datetime(3)" json:"openUntil"`   // 「授業を開始」で、この時刻まで開く
@@ -37,6 +43,15 @@ type Room struct {
 	// DB には保存しない、レスポンス用の項目
 	OwnerName string `gorm:"-" json:"ownerName"`
 	IsOpen    bool   `gorm:"-" json:"isOpen"`
+}
+
+// ルームの時間帯(曜日 + 開始〜終了の時限)
+type RoomSlot struct {
+	ID        int64  `gorm:"primaryKey;autoIncrement" json:"-"`
+	RoomID    string `gorm:"size:32;not null;index" json:"-"`
+	DayOfWeek int    `gorm:"type:tinyint;not null" json:"dayOfWeek"` // 0=日 … 6=土
+	Period    int    `gorm:"type:tinyint;not null" json:"period"`
+	PeriodEnd int    `gorm:"type:tinyint;not null" json:"periodEnd"`
 }
 
 // QR を読み取った学生
@@ -90,12 +105,62 @@ func (r *Room) LastPeriod() int {
 	return r.PeriodEnd
 }
 
-// 同じ曜日で、時限が1コマでも重なっていれば同じ時間帯
-func (r *Room) Overlaps(o *Room) bool {
-	return r.DayOfWeek == o.DayOfWeek && r.Period <= o.LastPeriod() && o.Period <= r.LastPeriod()
+func (s RoomSlot) LastPeriod() int {
+	if s.PeriodEnd < s.Period {
+		return s.Period
+	}
+	return s.PeriodEnd
 }
 
-var allModels = []any{&User{}, &Room{}, &Enrollment{}, &Call{}, &Memo{}, &PushSubscription{}}
+// 同じ曜日で、時限が1コマでも重なっていれば同じ時間帯
+func (s RoomSlot) Overlaps(o RoomSlot) bool {
+	return s.DayOfWeek == o.DayOfWeek && s.Period <= o.LastPeriod() && o.Period <= s.LastPeriod()
+}
+
+// ルームの時間帯。時間帯の表をまだ読み込んでいない(古い)ルームは、ルームの曜日・時限を1つの時間帯とみなす
+func (r *Room) TimeSlots() []RoomSlot {
+	if len(r.Slots) > 0 {
+		return r.Slots
+	}
+	return []RoomSlot{{RoomID: r.ID, DayOfWeek: r.DayOfWeek, Period: r.Period, PeriodEnd: r.LastPeriod()}}
+}
+
+// どれかの時間帯が1コマでも重なっていれば、同じ時間帯の授業
+func (r *Room) Overlaps(o *Room) bool {
+	for _, a := range r.TimeSlots() {
+		for _, b := range o.TimeSlots() {
+			if a.Overlaps(b) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// 時間帯を月曜1限から順に並べ、先頭の時間帯をルームの曜日・時限にそろえる
+func (r *Room) SetSlots(slots []RoomSlot) {
+	sort.SliceStable(slots, func(i, j int) bool {
+		if weekdayOrder(slots[i].DayOfWeek) != weekdayOrder(slots[j].DayOfWeek) {
+			return weekdayOrder(slots[i].DayOfWeek) < weekdayOrder(slots[j].DayOfWeek)
+		}
+		return slots[i].Period < slots[j].Period
+	})
+	for i := range slots {
+		slots[i].ID, slots[i].RoomID, slots[i].PeriodEnd = 0, r.ID, slots[i].LastPeriod()
+	}
+	r.Slots = slots
+	r.DayOfWeek, r.Period, r.PeriodEnd = slots[0].DayOfWeek, slots[0].Period, slots[0].PeriodEnd
+}
+
+// 並び順の曜日(月曜が先頭、日曜は土曜のあと)
+func weekdayOrder(dow int) int {
+	if dow == 0 {
+		return 7
+	}
+	return dow
+}
+
+var allModels = []any{&User{}, &Room{}, &RoomSlot{}, &Enrollment{}, &Call{}, &Memo{}, &PushSubscription{}}
 
 // ---------- レスポンス用 ----------
 
