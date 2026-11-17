@@ -111,6 +111,11 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 }
 .tab.active { color: var(--board); }
 .tabbar.desktop-only, .desktop-only, .sidenav-brand, .sidenav-user { display: none; }
+/* マウスで操作する PC では、ウィンドウを狭くして(画面の半分など)1列の表示になっても、
+   先生のルームの一番下に参加用の QR を出す。スマホ・タブレット(タッチ操作)では出さない */
+@media (hover: hover) and (pointer: fine) {
+  .qr-card.desktop-only { display: flex; }
+}
 @media (prefers-color-scheme: dark) { .tab.active { color: var(--board-ink); } }
 
 /* 画面の下に固定する主な操作 */
