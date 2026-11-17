@@ -192,7 +192,7 @@ func (app *App) applyRoomInput(c echo.Context, r *Room) error {
 	if err := c.Bind(&in); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "入力が不正です")
 	}
-	in.Subject, in.ClassName = strings.TrimSpace(in.Subject), strings.TrimSpace(in.ClassName)
+	in.Subject, in.ClassName = strings.TrimSpace(in.Subject), normalizeClassNames(in.ClassName)
 	if in.PeriodEnd == 0 {
 		in.PeriodEnd = in.Period
 	}
@@ -204,8 +204,27 @@ func (app *App) applyRoomInput(c echo.Context, r *Room) error {
 	if in.PeriodEnd < in.Period {
 		return echo.NewHTTPError(http.StatusBadRequest, "終了の時限は開始の時限以降にしてください")
 	}
+	if len(in.ClassName) > 255 || len(in.Subject) > 255 {
+		return echo.NewHTTPError(http.StatusBadRequest, "科目名・クラス名が長すぎます")
+	}
 	r.Subject, r.ClassName, r.DayOfWeek, r.Period, r.PeriodEnd = in.Subject, in.ClassName, in.DayOfWeek, in.Period, in.PeriodEnd
 	return nil
+}
+
+// 合同授業などで複数のクラスがあるときは「IE2A、IE2B」のように「、」区切りで保存する。
+// 「,」「，」「/」「／」区切りや前後の空白、重複もそろえる
+func normalizeClassNames(s string) string {
+	parts := strings.FieldsFunc(s, func(r rune) bool { return strings.ContainsRune("、,，/／\n", r) })
+	seen := map[string]bool{}
+	var out []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, "、")
 }
 
 func slotTakenError(err error) error {

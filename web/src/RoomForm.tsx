@@ -2,6 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { DAYS, type RoomInput } from './api'
 import { useApp } from './app-context'
 import { ErrorText } from './components'
+import { IconClose, IconPlus } from './icons'
+
+// クラス名は「IE2A、IE2B」のように「、」区切りで保存する(合同授業など、複数のクラスが一緒に受ける授業)
+const splitClasses = (s: string) => s.split(/[、,，/／\n]/).map((c) => c.trim()).filter(Boolean)
 
 // ルームの作成・変更で使う入力フォーム。開始〜終了の時限で、連続した複数コマを指定できる
 export function RoomForm({ initial, submitLabel, onSubmit, onCancel }: {
@@ -12,6 +16,7 @@ export function RoomForm({ initial, submitLabel, onSubmit, onCancel }: {
 }) {
   const { config } = useApp()
   const [form, setForm] = useState<RoomInput>(initial)
+  const [classes, setClasses] = useState<string[]>(() => { const c = splitClasses(initial.className); return c.length ? c : [''] })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const periods = config?.periods ?? []
@@ -20,7 +25,7 @@ export function RoomForm({ initial, submitLabel, onSubmit, onCancel }: {
     e.preventDefault()
     setError('')
     setBusy(true)
-    try { await onSubmit(form) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+    try { await onSubmit({ ...form, className: classes.map((c) => c.trim()).filter(Boolean).join('、') }) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
   }
 
   return (
@@ -28,9 +33,26 @@ export function RoomForm({ initial, submitLabel, onSubmit, onCancel }: {
       <label>科目名
         <input required enterKeyHint="next" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="IoT制作" />
       </label>
-      <label>クラス名
-        <input required value={form.className} onChange={(e) => setForm({ ...form, className: e.target.value })} placeholder="IE2A" />
-      </label>
+      <fieldset className="class-fields">
+        <legend>クラス名</legend>
+        {classes.map((c, i) => (
+          <div className="class-field" key={i}>
+            <input
+              required={i === 0} value={c} placeholder={i === 0 ? 'IE2A' : 'IE2B'}
+              aria-label={`クラス名 ${i + 1}`} autoFocus={i > 0 && c === ''}
+              onChange={(e) => setClasses(classes.map((x, j) => (j === i ? e.target.value : x)))}
+            />
+            {classes.length > 1 && (
+              <button type="button" className="icon-btn" aria-label={`クラス名 ${i + 1} を削除`}
+                onClick={() => setClasses(classes.filter((_, j) => j !== i))}><IconClose /></button>
+            )}
+          </div>
+        ))}
+        <button type="button" className="btn small add-class" onClick={() => setClasses([...classes, ''])}>
+          <IconPlus />クラスを追加
+        </button>
+        <p className="hint">合同授業など、複数のクラスが一緒に受ける授業はクラスを追加します。</p>
+      </fieldset>
       <label>曜日
         <select value={form.dayOfWeek} onChange={(e) => setForm({ ...form, dayOfWeek: Number(e.target.value) })}>
           {[1, 2, 3, 4, 5, 6].map((d) => <option key={d} value={d}>{DAYS[d]}曜</option>)}
