@@ -109,6 +109,7 @@ export const api = {
   cancelCall: (roomId: string) => request<void>('DELETE', `/api/rooms/${roomId}/calls/mine`),
 
   pushSubscribe: (sub: PushSubscriptionJSON) => request<void>('POST', '/api/push/subscribe', sub),
+  pushUnsubscribe: (endpoint: string) => request<void>('DELETE', '/api/push/subscribe', { endpoint }),
 }
 
 export const DAYS = ['日', '月', '火', '水', '木', '金', '土']
