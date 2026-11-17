@@ -51,12 +51,34 @@ function urlBase64ToUint8Array(base64: string) {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0))
 }
 
+// 「この端末の通知をオフにする」を選んだか(端末ごと)。オフの間は、アプリを開いても登録し直さない
+const OFF_KEY = 'push-off'
+export function isPushOff() {
+  try { return localStorage.getItem(OFF_KEY) === '1' } catch { return false }
+}
+function setPushOff(off: boolean) {
+  try { if (off) localStorage.setItem(OFF_KEY, '1'); else localStorage.removeItem(OFF_KEY) } catch { /* 保存できない環境は無視 */ }
+}
+
+// この端末の通知をオフにする。サーバーの登録を消し、ブラウザの購読もやめる(ほかの端末の通知はそのまま)
+export async function disablePush() {
+  setPushOff(true)
+  resynced = null
+  if (!pushSupported()) return
+  const reg = await navigator.serviceWorker.getRegistration()
+  const sub = await reg?.pushManager.getSubscription()
+  if (!sub) return
+  await api.pushUnsubscribe(sub.endpoint)
+  await sub.unsubscribe().catch(() => undefined)
+}
+
 // 必ずボタンのタップから呼ぶこと(iOS はユーザー操作なしでは許可ダイアログを出せない)
 export async function enablePush(vapidPublicKey: string): Promise<'ok' | 'denied' | 'unsupported' | 'no-key'> {
   if (!pushSupported()) return 'unsupported'
   if (!vapidPublicKey) return 'no-key'
   const perm = await Notification.requestPermission()
   if (perm !== 'granted') return 'denied'
+  setPushOff(false)
   // Service Worker の登録に失敗していると ready が永遠に終わらないので、時間を区切る
   const reg = await Promise.race([
     navigator.serviceWorker.ready,
@@ -82,7 +104,7 @@ export async function enablePush(vapidPublicKey: string): Promise<'ok' | 'denied
 // 画面ごとに呼ばれるので、アプリを開いている間は1回だけにする
 let resynced: Promise<void> | null = null
 export function resyncPush(vapidPublicKey: string) {
-  if (!pushSupported() || Notification.permission !== 'granted' || !vapidPublicKey) return Promise.resolve()
+  if (!pushSupported() || Notification.permission !== 'granted' || !vapidPublicKey || isPushOff()) return Promise.resolve()
   resynced ??= enablePush(vapidPublicKey).then(() => undefined, () => { resynced = null })
   return resynced
 }

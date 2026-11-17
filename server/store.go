@@ -472,6 +472,11 @@ func (s *Store) PushSubs(ctx context.Context, userID string) ([]PushSubscription
 	return subs, err
 }
 
+// 自分の購読だけを消す(ほかの人の端末の登録は消せない)
+func (s *Store) DeleteMyPushSub(ctx context.Context, userID, endpoint string) error {
+	return s.db.WithContext(ctx).Where("user_id = ? AND endpoint = ?", userID, endpoint).Delete(&PushSubscription{}).Error
+}
+
 func (s *Store) DeletePushSub(ctx context.Context, endpoint string) error {
 	return s.db.WithContext(ctx).Where("endpoint = ?", endpoint).Delete(&PushSubscription{}).Error
 }

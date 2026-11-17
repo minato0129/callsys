@@ -57,6 +57,7 @@ func (app *App) routes(e *echo.Echo) {
 
 	// Push
 	api.POST("/push/subscribe", app.handlePushSubscribe, login)
+	api.DELETE("/push/subscribe", app.handlePushUnsubscribe, login)
 	api.POST("/push/test", app.handlePushTest, login)
 }
 
@@ -611,6 +612,20 @@ func (app *App) handlePushSubscribe(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "購読情報が不正です")
 	}
 	if err := app.store.SavePushSub(c.Request().Context(), currentUser(c).ID, &in); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// DELETE /api/push/subscribe この端末の通知をオフにする(購読をサーバーから消す)。ほかの端末の通知はそのまま
+func (app *App) handlePushUnsubscribe(c echo.Context) error {
+	var in struct {
+		Endpoint string `json:"endpoint"`
+	}
+	if err := c.Bind(&in); err != nil || in.Endpoint == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "購読情報が不正です")
+	}
+	if err := app.store.DeleteMyPushSub(c.Request().Context(), currentUser(c).ID, in.Endpoint); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)

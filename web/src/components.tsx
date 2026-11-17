@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { api, CALL_LABEL, type CallType } from './api'
 import { useApp } from './app-context'
 import { IconBack, IconCheck, IconMemo, IconQuestion, IconRooms, IconUser } from './icons'
-import { enablePush, isIOS, isStandalone, pushSupported, pushUnsupportedReason, resyncPush, sendTestPush } from './push'
+import { disablePush, enablePush, isIOS, isPushOff, isStandalone, pushSupported, pushUnsupportedReason, resyncPush, sendTestPush } from './push'
 
 // ---------- 画面の枠 ----------
 
@@ -105,11 +105,14 @@ export function elapsed(fromIso: string, nowMs: number) {
 
 // ---------- 通知 ----------
 
-type PushState = NotificationPermission | 'unsupported'
+type PushState = NotificationPermission | 'unsupported' | 'off'
 
 function usePushState() {
   const { config } = useApp()
-  const [state, setState] = useState<PushState>(pushSupported() ? Notification.permission : 'unsupported')
+  // 'off': 通知は許可済みだが、この端末の通知を自分でオフにしている
+  const [state, setState] = useState<PushState>(
+    !pushSupported() ? 'unsupported' : Notification.permission === 'granted' && isPushOff() ? 'off' : Notification.permission,
+  )
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
   useEffect(() => { if (config) void resyncPush(config.vapidPublicKey) }, [config])
@@ -129,7 +132,19 @@ function usePushState() {
       setBusy(false)
     }
   }
-  return { state, msg, busy, enable }
+  const disable = async () => {
+    setMsg('')
+    setBusy(true)
+    try {
+      await disablePush()
+      setState('off')
+    } catch (e) {
+      setMsg(`通知をオフにできませんでした: ${(e as Error).message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return { state, msg, busy, enable, disable }
 }
 
 // 画面の上に出す細い案内。通知がまだオフのときだけ出す(ブロック・非対応の説明はアカウント画面)
@@ -147,8 +162,10 @@ export function PushBanner({ text }: { text: string }) {
 
 // アカウント画面の「通知」の欄。状態に応じて、オンにする・テスト・直し方を出す
 export function PushSettings() {
-  const { config } = useApp()
-  const { state, msg, busy, enable } = usePushState()
+  const { config, user } = useApp()
+  const { state, msg, busy, enable, disable } = usePushState()
+  // 先生は通知をオフにできる(授業がない日・会議中など)。学生は自分の番を逃さないよう、オフのボタンは出さない
+  const canTurnOff = user?.role === 'TEACHER'
   const [testing, setTesting] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -184,6 +201,18 @@ export function PushSettings() {
               {testing ? '送信中…' : 'テスト通知を送る'}
             </button>
             {result && <p className={`group-note ${result.ok ? '' : 'error'}`}>{result.text}</p>}
+            {canTurnOff && (
+              <button type="button" className="group-row action danger" disabled={busy} onClick={() => { setResult(null); void disable() }}>
+                この端末の通知をオフにする
+              </button>
+            )}
+          </>
+        )}
+        {state === 'off' && (
+          <>
+            <div className="group-row"><span>この端末の通知</span><span className="muted">オフ</span></div>
+            <p className="group-note">呼び出されても、この端末には通知が届きません。ルームの画面を開いていれば、呼び出しはすぐ表示されます。ほかの端末の通知はそのままです。</p>
+            <button type="button" className="group-row action" disabled={busy} onClick={() => void enable()}>通知をオンにする</button>
           </>
         )}
         {state === 'default' && (
