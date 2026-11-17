@@ -44,3 +44,6 @@ export const IconQuestion = (p: P) => (
 export const IconCheck = (p: P) => (
   <svg {...base(p)}><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 12.5l2 2 4-4.5" /></svg>
 )
+export const IconLeave = (p: P) => (
+  <svg {...base(p)}><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10" /></svg>
+)

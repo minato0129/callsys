@@ -52,7 +52,8 @@ export interface Memo {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message) }
+  // data: エラーのときにサーバーが返した JSON(参加の 409 では、参加中の同じ時間帯の授業など)
+  constructor(public status: number, message: string, public data?: unknown) { super(message) }
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -64,8 +65,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   })
   if (!res.ok) {
     let msg = `エラーが発生しました (${res.status})`
-    try { msg = (await res.json()).error ?? msg } catch { /* noop */ }
-    throw new ApiError(res.status, msg)
+    let data: unknown
+    try { data = await res.json(); msg = (data as { error?: string }).error ?? msg } catch { /* noop */ }
+    throw new ApiError(res.status, msg, data)
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()
@@ -99,7 +101,9 @@ export const api = {
   studentQueue: (id: string) => request<StudentQueue>('GET', `/api/rooms/${id}/queue`),
 
   // 学生
-  join: (roomId: string) => request<Room>('POST', '/api/join', { roomId }),
+  // replace: 同じ時間帯の授業に参加しているとき、そちらを抜けてから参加する
+  join: (roomId: string, replace = false) => request<Room>('POST', '/api/join', { roomId, replace }),
+  leaveRoom: (roomId: string) => request<void>('DELETE', `/api/rooms/${roomId}/enrollment`),
   myRooms: () => request<{ rooms: Room[]; current: Room | null }>('GET', '/api/my/rooms'),
   call: (roomId: string, type: CallType) => request<void>('POST', `/api/rooms/${roomId}/calls`, { type }),
   cancelCall: (roomId: string) => request<void>('DELETE', `/api/rooms/${roomId}/calls/mine`),
@@ -109,6 +113,9 @@ export const api = {
 
 export const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 export const CALL_LABEL: Record<CallType, string> = { QUESTION: '質問', CHECK: '課題チェック' }
+
+// 参加しようとした授業と同じ時間帯の授業に、すでに参加しているとき(409)
+export interface JoinConflict { error: string; conflict: Room; room: Room }
 
 export interface RoomInput { subject: string; className: string; dayOfWeek: number; period: number; periodEnd: number }
 

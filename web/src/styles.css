@@ -136,6 +136,7 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
 .btn:active { transform: scale(.98); }
 .btn.primary { background: var(--board); border-color: var(--board); color: var(--board-ink); }
 .btn.danger-outline { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: var(--surface); }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: var(--surface); }
 .btn.wide { width: 100%; }
 .btn.large { min-height: 56px; font-size: 1.05rem; border-radius: 16px; }
 .btn.small { min-height: 40px; padding: 0 14px; font-size: .9rem; border-radius: 12px; }
@@ -164,6 +165,18 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
 .banner > p { flex: 1; font-size: .88rem; font-weight: 600; min-width: 0; }
 .banner.tall > p { font-weight: 400; }
 .banner-error { flex-basis: 100%; }
+
+/* 参加: 同じ時間帯の授業に参加しているとき */
+.page-title { font-size: 1.25rem; font-weight: 900; line-height: 1.4; }
+.stack-tight { display: flex; flex-direction: column; gap: 8px; }
+.join-compare { display: flex; flex-direction: column; gap: 10px; }
+.join-room { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.join-room.highlight { border: 2px solid var(--board); }
+.join-room-label { font-size: .75rem; font-weight: 800; color: var(--muted); }
+.join-room.highlight .join-room-label { color: var(--board); }
+.join-room-title { font-weight: 900; font-size: 1.1rem; }
+.join-room-sub { font-size: .85rem; color: var(--muted); }
+.bullets { margin: 0; padding-left: 1.2em; list-style: disc; display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: .92rem; }
 
 .empty { padding: 32px 8px; text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 12px; }
 .empty-title { color: var(--ink); font-weight: 800; font-size: 1.05rem; }
