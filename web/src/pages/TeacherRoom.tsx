@@ -3,16 +3,18 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { api, CALL_LABEL, slotLabel, type Call, type Room, type TeacherQueue } from '../api'
 import { useNow, useRoomEvents } from '../app-context'
-import { elapsed, ErrorText, Header, IconButton, MenuSheet, PushBanner, Sheet, TabBar } from '../components'
+import { elapsed, ErrorText, Header, IconButton, MenuSheet, PushBanner, Sheet, TabBar, TypeBadge } from '../components'
 import { IconClose, IconEdit, IconMore, IconQR, IconTrash } from '../icons'
 import { RoomForm } from '../RoomForm'
 import { chime, onForegroundPush } from '../push'
 
 // showMemoChip: メモの中身を横に出している所では「メモあり」は出さない
-function CallChips({ c, showMemoChip = true }: { c: Call; showMemoChip?: boolean }) {
+const typeClass = (c: Call) => (c.type === 'CHECK' ? 'check' : 'question')
+
+function CallChips({ c, showMemoChip = true, showType = true }: { c: Call; showMemoChip?: boolean; showType?: boolean }) {
   return (
     <span className="chips">
-      <span className={`chip ${c.type === 'CHECK' ? 'check' : 'question'}`}>{CALL_LABEL[c.type]}</span>
+      {showType && <span className={`chip ${typeClass(c)}`}>{CALL_LABEL[c.type]}</span>}
       {(c.callsToday ?? 0) > 1 && <span className="chip plain">{c.callsToday}回目</span>}
       {showMemoChip && c.memo && <span className="chip plain">メモあり</span>}
     </span>
@@ -105,10 +107,12 @@ export default function TeacherRoom() {
         <div className="room-main">
           {/* いちばん前の人。黒板のようなカードで大きく出す */}
           {head ? (
-            <section className="board" aria-live="polite">
+            <section className={`board ${typeClass(head)}`} aria-live="polite">
               <div className="board-top">
                 <span className="board-no" aria-label="1番目">1</span>
-                <CallChips c={head} showMemoChip={false} />
+                {/* 種類は黒板の色と、大きな名前の両方で分かるようにする */}
+                <TypeBadge type={head.type} />
+                <CallChips c={head} showMemoChip={false} showType={false} />
                 <span className="board-time">{elapsed(head.createdAt, now)}</span>
               </div>
               <p className="board-name">{head.studentName}</p>
@@ -122,7 +126,7 @@ export default function TeacherRoom() {
           )}
 
           {next && (
-            <button type="button" className="next-row" onClick={() => openCall(next)}>
+            <button type="button" className={`next-row ${typeClass(next)}`} onClick={() => openCall(next)}>
               <span className="next-label">次</span>
               <span className="next-name">{next.studentName}</span>
               <CallChips c={next} />
@@ -150,8 +154,8 @@ export default function TeacherRoom() {
           {queue && (
             <dl className="stats">
               <div><dt>待っている人</dt><dd>{queue.counts.total}</dd></div>
-              <div><dt>質問</dt><dd>{queue.counts.question}</dd></div>
-              <div><dt>課題チェック</dt><dd>{queue.counts.check}</dd></div>
+              <div><dt className="question">質問</dt><dd className="question">{queue.counts.question}</dd></div>
+              <div><dt className="check">課題チェック</dt><dd className="check">{queue.counts.check}</dd></div>
             </dl>
           )}
 

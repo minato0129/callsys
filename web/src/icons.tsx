@@ -37,3 +37,10 @@ export const IconClose = (p: P) => <svg {...base(p)}><path d="M6 6l12 12M18 6L6 
 export const IconDownload = (p: P) => <svg {...base(p)}><path d="M12 4v12M7 11l5 5 5-5M5 20h14" /></svg>
 export const IconEdit = (p: P) => <svg {...base(p)}><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></svg>
 export const IconTrash = (p: P) => <svg {...base(p)}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+// 呼び出しの種類(質問 / 課題チェック)。色だけでなく形でも見分けられるように
+export const IconQuestion = (p: P) => (
+  <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" /></svg>
+)
+export const IconCheck = (p: P) => (
+  <svg {...base(p)}><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 12.5l2 2 4-4.5" /></svg>
+)
