@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, CALL_LABEL, slotLabel, type CallType, type Room, type StudentQueue } from '../api'
 import { useRoomEvents } from '../app-context'
-import { ErrorText, Header, PushBanner } from '../components'
-import { IconUser } from '../icons'
+import { ErrorText, Header, PushBanner, TypeBadge } from '../components'
+import { IconCheck, IconQuestion, IconUser } from '../icons'
 import { chime, onForegroundPush } from '../push'
 
 export default function StudentRoom() {
@@ -56,7 +56,7 @@ export default function StudentRoom() {
         <PushBanner text="自分の番が近づいたら通知を受け取る" />
 
         {/* 整理券。呼び出し中は自分の順番を大きく出す */}
-        <section className={`ticket ${waiting ? 'waiting' : ''} ${first ? 'first' : ''}`} aria-live="polite">
+        <section className={`ticket ${waiting ? 'waiting' : ''} ${first ? 'first' : ''} ${waiting ? (queue!.myType === 'CHECK' ? 'check' : 'question') : ''}`} aria-live="polite">
           {loadError ? (
             <>
               <p className="ticket-head">状況を取得できませんでした</p>
@@ -67,7 +67,7 @@ export default function StudentRoom() {
             <p className="muted">読み込み中…</p>
           ) : waiting ? (
             <>
-              <p className="ticket-head">{CALL_LABEL[queue.myType as CallType]}で呼び出し中</p>
+              <p className="ticket-head"><TypeBadge type={queue.myType as CallType} />で呼び出し中</p>
               <p className="ticket-no"><b>{queue.position}</b><span>番目</span></p>
               <p className="ticket-foot">
                 {first ? (notice || '次はあなたの番です。先生が来るまで待ってください') : `前に ${queue.position - 1} 人います`}
@@ -100,6 +100,7 @@ export default function StudentRoom() {
             {(['QUESTION', 'CHECK'] as CallType[]).map((t) => (
               <button key={t} type="button" className={`call-btn ${t === 'CHECK' ? 'check' : 'question'}`}
                 disabled={!open || busy} onClick={() => void call(t)}>
+                {t === 'CHECK' ? <IconCheck /> : <IconQuestion />}
                 {CALL_LABEL[t]}
               </button>
             ))}

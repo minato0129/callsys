@@ -14,13 +14,15 @@
   --board-soft: #dbe7e1;
   --chalk: #f4c63d;      /* 黄色のチョーク。順番が来た・授業中 */
   --chalk-ink: #2a2100;
-  --question: #2d63ad;
-  --question-soft: #e0e9f6;
-  --check: #b0562a;
-  --check-soft: #f6e4da;
-  /* 先生のルームの先頭カード(黒板)の色。質問は青、課題チェックはレンガ色にして、ひと目で分かるように */
-  --board-question: #1f4677;
-  --board-check: #7f3a17;
+  /* 呼び出しの種類の色。学生の画面(ボタン・整理券)と先生の画面(先頭のカード・次の人・人数)で同じ色を使う
+     --question / --check: 塗りの色(白い文字をのせる)。ダークモードでも同じ
+     --*-text: 背景の上の文字の色、--*-soft: 薄い背景 */
+  --question: #6a4fc0;      /* 質問: 紫 */
+  --question-text: #5b41b0;
+  --question-soft: #ebe6f8;
+  --check: #0f7f86;         /* 課題チェック: 青緑 */
+  --check-text: #0b6f75;
+  --check-soft: #dcf0f1;
   --danger: #b3261e;
   --tab-h: 64px;
   --radius-lg: 22px;
@@ -34,8 +36,7 @@
   :root {
     --paper: #101614; --surface: #19211e; --ink: #e8eeea; --muted: #9aa7a0; --line: #2a3530;
     --board: #2f7a63; --board-ink: #f3f6f2; --board-soft: #1f322b;
-    --question: #7fb0ec; --question-soft: #1c2a3a; --check: #e59a6a; --check-soft: #3a281d;
-    --board-question: #1d3b63; --board-check: #6a3216;
+    --question-text: #b4a3f0; --question-soft: #2a2340; --check-text: #5cc7cd; --check-soft: #15302f;
     --danger: #ff8a80;
     color-scheme: dark;
   }
@@ -142,8 +143,17 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
 
 .chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .chip { font-size: .75rem; line-height: 1.6; padding: 1px 9px; border-radius: 99px; font-weight: 700; white-space: nowrap; }
-.chip.question { background: var(--question-soft); color: var(--question); }
-.chip.check { background: var(--check-soft); color: var(--check); }
+.chip.question { background: var(--question-soft); color: var(--question-text); }
+.chip.check { background: var(--check-soft); color: var(--check-text); }
+
+/* 種類のバッジ(白地にアイコンと名前)。色の付いた面の上に置く */
+.type-badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 99px;
+  background: #fff; font-weight: 900; font-size: 1rem; line-height: 1.5; white-space: nowrap;
+}
+.type-badge.question { color: var(--question); }
+.type-badge.check { color: var(--check); }
+.type-badge svg { width: 16px; height: 16px; }
 .chip.plain { background: var(--line); color: var(--muted); }
 
 /* 通知・インストールの細い案内 */
@@ -274,16 +284,9 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
 .board-name { font-size: 2rem; font-weight: 900; line-height: 1.25; letter-spacing: .02em; overflow-wrap: anywhere; }
 .board-memo { font-size: .9rem; opacity: .85; border-left: 3px solid rgb(255 255 255 / .35); padding-left: 10px; white-space: pre-wrap; }
 .btn.board-btn { min-height: 56px; margin-top: 4px; background: var(--chalk); border-color: var(--chalk); color: var(--chalk-ink); font-size: 1.1rem; }
-/* 種類で黒板の色を変え、種類の名前も大きく出す */
-.board.question { background: var(--board-question); }
-.board.check { background: var(--board-check); }
-.board-type {
-  display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 99px;
-  background: #fff; font-weight: 900; font-size: 1rem; line-height: 1.5; white-space: nowrap;
-}
-.board.question .board-type { color: var(--board-question); }
-.board.check .board-type { color: var(--board-check); }
-.board-type svg { width: 16px; height: 16px; }
+/* 種類でカードの色を変える(学生の画面のボタン・整理券と同じ色) */
+.board.question { background: var(--question); }
+.board.check { background: var(--check); }
 .empty-board { min-height: 160px; justify-content: center; align-items: center; text-align: center; background: var(--surface); color: var(--muted); border: 1px dashed var(--line); }
 
 .next-row {
@@ -300,8 +303,8 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
 .stats > div { background: var(--surface); padding: 10px 14px; }
 .stats dt { font-size: .75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .stats dd { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.3; }
-.stats dt.question, .stats dd.question { color: var(--question); }
-.stats dt.check, .stats dd.check { color: var(--check); }
+.stats dt.question, .stats dd.question { color: var(--question-text); }
+.stats dt.check, .stats dd.check { color: var(--check-text); }
 .stats dt.question::before, .stats dt.check::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: 1px; }
 
 /* PC だけ: 横に出しておく参加用の QR */
@@ -355,20 +358,29 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
 .ticket-no.idle b { font-size: clamp(4rem, 24vw, 6rem); color: var(--muted); }
 .ticket-foot { font-weight: 700; max-width: 22em; }
 .ticket.waiting { background: var(--board); border-color: var(--board); color: var(--board-ink); }
+.ticket.waiting.question { background: var(--question); border-color: var(--question); color: #fff; }
+.ticket.waiting.check { background: var(--check); border-color: var(--check); color: #fff; }
+.ticket-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
 .ticket.waiting::before, .ticket.waiting::after { border-color: rgb(255 255 255 / .25); }
-.ticket.waiting .ticket-head { color: inherit; opacity: .8; }
-.ticket.first { background: var(--chalk); border-color: var(--chalk); color: var(--chalk-ink); }
+.ticket.waiting .ticket-head { color: inherit; }
+.ticket.first, .ticket.first.question, .ticket.first.check { background: var(--chalk); border-color: var(--chalk); color: var(--chalk-ink); }
+/* 1番目は黄色の整理券。種類は上の帯で分かるようにする */
+.ticket.first.question { box-shadow: inset 0 10px 0 var(--question); }
+.ticket.first.check { box-shadow: inset 0 10px 0 var(--check); }
+.ticket.first .type-badge.question { background: var(--question); color: #fff; }
+.ticket.first .type-badge.check { background: var(--check); color: #fff; }
 .ticket.first::before, .ticket.first::after { border-color: rgb(0 0 0 / .18); }
 
 .call-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.call-btn svg { width: 28px; height: 28px; }
 .call-btn {
   min-height: 96px; border-radius: var(--radius-lg); border: 0; cursor: pointer;
   font-size: 1.25rem; font-weight: 900; color: #fff; transition: transform .08s ease;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
 }
 .call-btn:active { transform: scale(.97); }
 .call-btn.question { background: var(--question); }
 .call-btn.check { background: var(--check); }
-@media (prefers-color-scheme: dark) { .call-btn { color: #0f1513; } }
 .call-btn:disabled { background: var(--line); color: var(--muted); cursor: default; }
 
 /* QR 読み取り: 全画面のカメラ映像に、中央の正方形の枠だけを明るく見せる */

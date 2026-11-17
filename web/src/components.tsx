@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { api } from './api'
+import { api, CALL_LABEL, type CallType } from './api'
 import { useApp } from './app-context'
-import { IconBack, IconMemo, IconRooms, IconUser } from './icons'
+import { IconBack, IconCheck, IconMemo, IconQuestion, IconRooms, IconUser } from './icons'
 import { enablePush, isIOS, isStandalone, pushSupported, pushUnsupportedReason, resyncPush, sendTestPush } from './push'
 
 // ---------- 画面の枠 ----------
@@ -239,5 +239,14 @@ export function LogoutButton() {
     <button type="button" className="btn wide" onClick={async () => { await api.logout(); setUser(null); nav('/login') }}>
       ログアウト
     </button>
+  )
+}
+
+// 呼び出しの種類のバッジ(アイコンと名前)。色だけでなく形と文字でも見分けられるように
+export function TypeBadge({ type }: { type: CallType }) {
+  return (
+    <span className={`type-badge ${type === 'CHECK' ? 'check' : 'question'}`}>
+      {type === 'CHECK' ? <IconCheck /> : <IconQuestion />}{CALL_LABEL[type]}
+    </span>
   )
 }

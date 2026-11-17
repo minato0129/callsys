@@ -3,8 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { api, CALL_LABEL, slotLabel, type Call, type Room, type TeacherQueue } from '../api'
 import { useNow, useRoomEvents } from '../app-context'
-import { elapsed, ErrorText, Header, IconButton, MenuSheet, PushBanner, Sheet, TabBar } from '../components'
-import { IconCheck, IconClose, IconEdit, IconMore, IconQR, IconQuestion, IconTrash } from '../icons'
+import { elapsed, ErrorText, Header, IconButton, MenuSheet, PushBanner, Sheet, TabBar, TypeBadge } from '../components'
+import { IconClose, IconEdit, IconMore, IconQR, IconTrash } from '../icons'
 import { RoomForm } from '../RoomForm'
 import { chime, onForegroundPush } from '../push'
 
@@ -111,7 +111,7 @@ export default function TeacherRoom() {
               <div className="board-top">
                 <span className="board-no" aria-label="1番目">1</span>
                 {/* 種類は黒板の色と、大きな名前の両方で分かるようにする */}
-                <span className="board-type">{head.type === 'CHECK' ? <IconCheck /> : <IconQuestion />}{CALL_LABEL[head.type]}</span>
+                <TypeBadge type={head.type} />
                 <CallChips c={head} showMemoChip={false} showType={false} />
                 <span className="board-time">{elapsed(head.createdAt, now)}</span>
               </div>
