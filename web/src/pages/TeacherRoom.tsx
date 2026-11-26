@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { api, CALL_LABEL, slotLabel, type Call, type Room, type TeacherQueue } from '../api'
+import { api, ApiError, CALL_LABEL, slotLabel, type Call, type OpenConflict, type Room, type TeacherQueue } from '../api'
 import { useNow, useRoomEvents } from '../app-context'
 import { elapsed, ErrorText, Header, IconButton, MenuSheet, PushBanner, Sheet, TabBar, TypeBadge } from '../components'
 import { IconClose, IconEdit, IconMore, IconQR, IconTrash } from '../icons'
@@ -29,7 +29,8 @@ export default function TeacherRoom() {
   const [queue, setQueue] = useState<TeacherQueue | null>(null)
   const [selected, setSelected] = useState<Call | null>(null)
   const [memo, setMemo] = useState('')
-  const [sheet, setSheet] = useState<'none' | 'menu' | 'edit' | 'qr'>('none')
+  const [sheet, setSheet] = useState<'none' | 'menu' | 'edit' | 'qr' | 'open-conflict'>('none')
+  const [openConflict, setOpenConflict] = useState<OpenConflict | null>(null)
   const [switching, setSwitching] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -67,7 +68,23 @@ export default function TeacherRoom() {
     try {
       setRoom(await (queue.isOpen ? api.closeRoom(id) : api.openRoom(id)))
       await load()
-    } catch (e) { setError((e as Error).message) } finally { setSwitching(false) }
+    } catch (e) {
+      // ほかのルームが授業中: どうするか選んでもらう
+      if (e instanceof ApiError && e.status === 409 && (e.data as OpenConflict)?.conflict) {
+        setOpenConflict(e.data as OpenConflict)
+        setSheet('open-conflict')
+      } else setError((e as Error).message)
+    } finally { setSwitching(false) }
+  }
+
+  // ほかのルームを終了して、このルームを開始する
+  const replaceSession = async () => {
+    setSwitching(true)
+    try {
+      setRoom(await api.openRoom(id, true))
+      setSheet('none')
+      await load()
+    } catch (e) { setError((e as Error).message); setSheet('none') } finally { setSwitching(false) }
   }
 
   const deleteRoom = async () => {
@@ -231,6 +248,29 @@ export default function TeacherRoom() {
       )}
 
       {/* 学生にスマホの画面を見せて読み取ってもらうので、全画面で大きく出す */}
+      {sheet === 'open-conflict' && openConflict && (
+        <Sheet title="ほかの授業が授業中です" onClose={closeSheet}>
+          <div className="stack">
+            <p>同時に開始できる授業は1つだけです。</p>
+            <div className="join-room">
+              <span className="join-room-label">授業中</span>
+              <span className="join-room-title">{openConflict.conflict.subject}</span>
+              <span className="join-room-sub">{openConflict.conflict.className}・{slotLabel(openConflict.conflict)}</span>
+            </div>
+            {openConflict.waiting > 0 && (
+              <div className="callout">
+                <p className="callout-title">「{openConflict.conflict.subject}」で待っている {openConflict.waiting} 人の呼び出しは取り消されます</p>
+              </div>
+            )}
+            <div className="stack-tight">
+              <button type="button" className="btn primary wide large" disabled={switching} onClick={() => void replaceSession()}>
+                「{openConflict.conflict.subject}」を終了して開始
+              </button>
+              <button type="button" className="btn wide" onClick={closeSheet}>やめる</button>
+            </div>
+          </div>
+        </Sheet>
+      )}
       {sheet === 'qr' && (
         <div className="qr-screen" role="dialog" aria-modal aria-label="参加用の QR コード">
           <button type="button" className="icon-btn qr-close" aria-label="閉じる" onClick={closeSheet}><IconClose /></button>

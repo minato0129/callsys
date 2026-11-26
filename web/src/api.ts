@@ -91,7 +91,8 @@ export const api = {
   finishCall: (roomId: string, callId: number, memo: string) =>
     request<void>('POST', `/api/rooms/${roomId}/calls/${callId}/done`, { memo }),
   ack: (roomId: string) => request<void>('POST', `/api/rooms/${roomId}/ack`),
-  openRoom: (roomId: string) => request<Room>('POST', `/api/rooms/${roomId}/open`),
+  // replace: ほかのルームが授業中なら、そちらを終了してから開始する
+  openRoom: (roomId: string, replace = false) => request<Room>('POST', `/api/rooms/${roomId}/open`, { replace }),
   closeRoom: (roomId: string) => request<Room>('POST', `/api/rooms/${roomId}/close`),
   memos: (roomId: string, date: string) =>
     request<Memo[]>('GET', `/api/rooms/${roomId}/memos?date=${encodeURIComponent(date)}`),
@@ -116,6 +117,9 @@ export const api = {
 
 export const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 export const CALL_LABEL: Record<CallType, string> = { QUESTION: '質問', CHECK: '課題チェック' }
+
+// 「授業を開始」したとき、ほかのルームが授業中(409)。先生が同時に開けるルームは1つだけ
+export interface OpenConflict { error: string; conflict: Room; waiting: number }
 
 // 参加しようとした授業と同じ時間帯の授業に、すでに参加しているとき(409)
 export interface JoinConflict { error: string; conflict: Room; room: Room }
