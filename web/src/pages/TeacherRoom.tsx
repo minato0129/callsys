@@ -7,6 +7,7 @@ import { elapsed, ErrorText, Header, IconButton, MenuSheet, PushBanner, Sheet, T
 import { IconClose, IconEdit, IconMore, IconQR, IconTrash, IconUsers } from '../icons'
 import { RoomTeachersSheet } from './RoomTeachersSheet'
 import { RoomForm } from '../RoomForm'
+import { copyText } from '../clipboard'
 import { chime, onForegroundPush } from '../push'
 
 // showMemoChip: メモの中身を横に出している所では「メモあり」は出さない
@@ -96,13 +97,14 @@ export default function TeacherRoom() {
 
   const joinUrl = `${location.origin}/join/${id}`
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
   // Teams などに貼れるよう、参加用のリンクをコピーする
   const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(joinUrl)
+    setCopyFailed(false)
+    if (await copyText(joinUrl)) {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
-    } catch { prompt('参加用のリンク', joinUrl) }
+    } else setCopyFailed(true) // どうしてもコピーできない端末では、リンクを選択した状態で出す
   }
 
   const [head, next] = queue?.head ?? []
@@ -188,6 +190,10 @@ export default function TeacherRoom() {
                 <button type="button" className="btn small" onClick={() => setSheet('qr')}>大きく表示</button>
                 <button type="button" className="btn small" onClick={() => void copyLink()}>{copied ? 'コピーしました' : 'リンクをコピー'}</button>
               </div>
+              {copyFailed && (
+                <input className="copy-fallback" readOnly value={joinUrl} aria-label="参加用のリンク"
+                  ref={(el) => { el?.focus(); el?.select() }} onFocus={(e) => e.currentTarget.select()} />
+              )}
             </div>
           </section>
         </aside>

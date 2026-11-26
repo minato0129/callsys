@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { api, type Room, type RoomTeachers } from '../api'
 import { useApp } from '../app-context'
 import { ErrorText, Sheet } from '../components'
+import { copyText } from '../clipboard'
 
 // ルームの担当の先生。
 // 作った先生: 招待リンク(QR・コピー・作り直し)と、招待した先生を外す
@@ -14,6 +15,7 @@ export function RoomTeachersSheet({ room, onClose }: { room: Room; onClose: () =
   const [data, setData] = useState<RoomTeachers | null>(null)
   const [token, setToken] = useState('')
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const isOwner = room.isOwner ?? false
@@ -28,11 +30,11 @@ export function RoomTeachersSheet({ room, onClose }: { room: Room; onClose: () =
   useEffect(() => { void load() }, [load])
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(inviteUrl)
+    setCopyFailed(false)
+    if (await copyText(inviteUrl)) {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
-    } catch { prompt('先生を招待するリンク', inviteUrl) }
+    } else setCopyFailed(true)
   }
 
   const reset = async () => {
@@ -67,6 +69,11 @@ export function RoomTeachersSheet({ room, onClose }: { room: Room; onClose: () =
               <div className="invite-link">
                 <QRCodeSVG value={inviteUrl} size={148} marginSize={1} className="invite-qr" />
                 <p className="invite-url">{inviteUrl}</p>
+                {/* どうしてもコピーできない端末では、リンクを選択した状態で出して手でコピーしてもらう */}
+                {copyFailed && (
+                  <input className="copy-fallback" readOnly value={inviteUrl} aria-label="先生を招待するリンク"
+                    ref={(el) => { el?.focus(); el?.select() }} onFocus={(e) => e.currentTarget.select()} />
+                )}
                 <div className="row">
                   <button type="button" className="btn" onClick={() => void copy()}>{copied ? 'コピーしました' : 'リンクをコピー'}</button>
                   <button type="button" className="btn" disabled={busy} onClick={() => void reset()}>作り直す</button>
