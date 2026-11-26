@@ -228,6 +228,27 @@ func (c *Config) roomOpen(r *Room, now time.Time) bool {
 	return false
 }
 
+// now より後で、limit より前に始まる時間帯があれば、そのいちばん早い開始時刻を返す(今日の分だけ)。
+// 「授業を開始」で開いたルームを、次の授業が時間割どおり始まる時刻で閉じるために使う
+func (c *Config) nextScheduledStart(r *Room, now, limit time.Time) (time.Time, bool) {
+	lt := now.In(c.Loc)
+	var best time.Time
+	for _, s := range r.TimeSlots() {
+		if s.DayOfWeek != int(lt.Weekday()) {
+			continue
+		}
+		startMin, _, ok := c.slotMinutes(s.Period, s.LastPeriod())
+		if !ok {
+			continue
+		}
+		start := time.Date(lt.Year(), lt.Month(), lt.Day(), startMin/60, startMin%60, 0, 0, c.Loc)
+		if start.After(now) && start.Before(limit) && (best.IsZero() || start.Before(best)) {
+			best = start
+		}
+	}
+	return best.UTC(), !best.IsZero()
+}
+
 // 今が時間割上の授業中(どれかの時間帯の中)なら、その時間帯の最後の時限の終了時刻を返す
 func (c *Config) roomScheduledEnd(r *Room, now time.Time) (time.Time, bool) {
 	for _, s := range r.TimeSlots() {

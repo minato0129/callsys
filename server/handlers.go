@@ -351,14 +351,54 @@ func (app *App) handleFinishCall(c echo.Context) error {
 // 手動で開始したときに開いておく長さ(1コマ分 + 余裕)
 const manualOpenDuration = 100 * time.Minute
 
-// POST /api/rooms/:id/open 「授業を開始」。時間割に関係なく、今から 100 分間開く
+// POST /api/rooms/:id/open 「授業を開始」。時間割に関係なく、今から 100 分間開く。
+// 先生が同時に開けるルームは1つだけ。ほかのルームが授業中なら 409 で、そのルームと待っている人数を返す。
+// replace: true なら、そのルームを終了してから開始する
 func (app *App) handleOpenRoom(c echo.Context) error {
 	room, err := app.ownerRoom(c)
 	if err != nil {
 		return err
 	}
+	var in struct {
+		Replace bool `json:"replace"`
+	}
+	_ = c.Bind(&in)
+	ctx := c.Request().Context()
+	rooms, err := app.store.ListRoomsByOwner(ctx, room.OwnerID)
+	if err != nil {
+		return err
+	}
+	t := time.Now()
+	for _, o := range rooms {
+		if o.ID == room.ID || !app.cfg.roomOpen(o, t) {
+			continue
+		}
+		if !in.Replace {
+			waiting, err := app.store.WaitingCalls(ctx, o.ID)
+			if err != nil {
+				return err
+			}
+			return c.JSON(http.StatusConflict, map[string]any{
+				"error":    "「" + o.Subject + "」が授業中です。同時に開始できる授業は1つだけです",
+				"conflict": app.withOpen(o),
+				"waiting":  len(waiting),
+			})
+		}
+		if err := app.closeRoom(ctx, o); err != nil {
+			return err
+		}
+	}
+	// 100 分の間に、ほかのルームの授業が時間割どおり始まるなら、その時刻で閉じる(2つ同時に授業中にならないように)
 	until := now().Add(manualOpenDuration)
-	if err := app.store.SetManualState(c.Request().Context(), room.ID, &until, nil); err != nil {
+	for _, o := range rooms {
+		if o.ID == room.ID {
+			continue
+		}
+		if start, ok := app.cfg.nextScheduledStart(o, t, until); ok {
+			until = start
+		}
+	}
+	if err := app.store.SetManualState(ctx, room.ID, &until, nil); err != nil {
 		return err
 	}
 	room.OpenUntil, room.ClosedUntil = &until, nil
@@ -372,7 +412,14 @@ func (app *App) handleCloseRoom(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	ctx := c.Request().Context()
+	if err := app.closeRoom(c.Request().Context(), room); err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, app.withOpen(room))
+}
+
+// 授業を終了する。残っている呼び出しは取り消し、学生・先生の画面に知らせる
+func (app *App) closeRoom(ctx context.Context, room *Room) error {
 	var closedUntil *time.Time
 	if end, ok := app.cfg.roomScheduledEnd(room, time.Now()); ok {
 		closedUntil = &end
@@ -386,7 +433,7 @@ func (app *App) handleCloseRoom(c echo.Context) error {
 	}
 	room.OpenUntil, room.ClosedUntil = nil, closedUntil
 	app.notifier.QueueChanged(room.ID, reasonClosed) // SSE の通知も含む
-	return c.JSON(http.StatusOK, app.withOpen(room))
+	return nil
 }
 
 func (app *App) handleAck(c echo.Context) error {

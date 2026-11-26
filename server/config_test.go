@@ -106,3 +106,32 @@ func TestRoomOpenMultiSlots(t *testing.T) {
 		t.Errorf("roomScheduledEnd = %v %v, want 15:00", end.In(c.Loc), ok)
 	}
 }
+
+func TestNextScheduledStart(t *testing.T) {
+	c := testConfig(t)
+	r := &Room{}
+	r.SetSlots([]RoomSlot{{DayOfWeek: 4, Period: 3, PeriodEnd: 4}, {DayOfWeek: 1, Period: 1, PeriodEnd: 1}}) // 木3〜4限・月1限
+	at := func(s string) time.Time {
+		tm, err := time.ParseInLocation("2006-01-02 15:04", s, c.Loc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tm
+	}
+	// 2026-11-19 は木曜。12:00 から 100 分(〜13:40)の間に 3限(13:30)が始まる
+	if got, ok := c.nextScheduledStart(r, at("2026-11-19 12:00"), at("2026-11-19 13:40")); !ok || !got.Equal(at("2026-11-19 13:30").UTC()) {
+		t.Errorf("木曜 12:00: got %v %v, want 13:30", got.In(c.Loc), ok)
+	}
+	// 11:00 から 100 分(〜12:40)の間には始まらない
+	if _, ok := c.nextScheduledStart(r, at("2026-11-19 11:00"), at("2026-11-19 12:40")); ok {
+		t.Error("木曜 11:00: 始まる授業はないはず")
+	}
+	// すでに始まっている時間帯(13:45 時点の 3限)は含めない
+	if _, ok := c.nextScheduledStart(r, at("2026-11-19 13:45"), at("2026-11-19 15:25")); ok {
+		t.Error("木曜 13:45: すでに始まった時間帯は含めない")
+	}
+	// 曜日が違えば含めない(2026-11-18 は水曜)
+	if _, ok := c.nextScheduledStart(r, at("2026-11-18 12:00"), at("2026-11-18 13:40")); ok {
+		t.Error("水曜: 始まる授業はないはず")
+	}
+}
