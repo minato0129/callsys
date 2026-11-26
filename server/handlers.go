@@ -36,6 +36,13 @@ func (app *App) routes(e *echo.Echo) {
 	api.PATCH("/rooms/:id", app.handleUpdateRoom, login, teacher)
 	api.DELETE("/rooms/:id", app.handleDeleteRoom, login, teacher)
 	api.POST("/rooms/:id/calls/:callId/done", app.handleFinishCall, login, teacher)
+	// 担当の先生(招待)
+	api.GET("/rooms/:id/teachers", app.handleListRoomTeachers, login, teacher)
+	api.DELETE("/rooms/:id/teachers/:userId", app.handleRemoveRoomTeacher, login, teacher)
+	api.GET("/rooms/:id/invite", app.handleGetInvite, login, teacher)
+	api.POST("/rooms/:id/invite/reset", app.handleResetInvite, login, teacher)
+	api.GET("/invites/:token", app.handleShowInvite, login)
+	api.POST("/invites/:token", app.handleAcceptInvite, login, teacher)
 	api.POST("/rooms/:id/ack", app.handleAck, login, teacher)
 	api.POST("/rooms/:id/open", app.handleOpenRoom, login, teacher)
 	api.POST("/rooms/:id/close", app.handleCloseRoom, login, teacher)
@@ -108,19 +115,49 @@ func (app *App) ownerRoom(c echo.Context) (*Room, error) {
 		return nil, err
 	}
 	if room.OwnerID != currentUser(c).ID {
+		return nil, echo.NewHTTPError(http.StatusForbidden, "このルームを作った先生だけができます")
+	}
+	room.IsOwner = true
+	return room, nil
+}
+
+// オーナーか受講登録済みの学生
+// ルームを作った先生か、招待されて担当している先生(呼び出しへの対応・授業の開始と終了・メモ)
+func (app *App) staffRoom(c echo.Context) (*Room, error) {
+	room, err := app.loadRoom(c)
+	if err != nil {
+		return nil, err
+	}
+	ok, err := app.isStaff(c.Request().Context(), room, currentUser(c))
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, echo.NewHTTPError(http.StatusForbidden, "このルームの先生ではありません")
 	}
 	return room, nil
 }
 
-// オーナーか受講登録済みの学生
+func (app *App) isStaff(ctx context.Context, room *Room, u *User) (bool, error) {
+	room.IsOwner = room.OwnerID == u.ID
+	if room.IsOwner {
+		return true, nil
+	}
+	if u.Role != "TEACHER" {
+		return false, nil
+	}
+	return app.store.IsRoomTeacher(ctx, room.ID, u.ID)
+}
+
 func (app *App) memberRoom(c echo.Context) (*Room, error) {
 	room, err := app.loadRoom(c)
 	if err != nil {
 		return nil, err
 	}
 	u := currentUser(c)
-	if room.OwnerID == u.ID {
+	if staff, err := app.isStaff(c.Request().Context(), room, u); err != nil {
+		return nil, err
+	} else if staff {
 		return room, nil
 	}
 	ok, err := app.store.IsEnrolled(c.Request().Context(), room.ID, u.ID)
@@ -146,12 +183,14 @@ func (app *App) handleConfig(c echo.Context) error {
 // ---------- teacher ----------
 
 func (app *App) handleListRooms(c echo.Context) error {
-	rooms, err := app.store.ListRoomsByOwner(c.Request().Context(), currentUser(c).ID)
+	u := currentUser(c)
+	rooms, err := app.store.ListTeacherRooms(c.Request().Context(), u.ID)
 	if err != nil {
 		return err
 	}
 	for _, r := range rooms {
 		app.withOpen(r)
+		r.IsOwner = r.OwnerID == u.ID
 	}
 	sortRooms(rooms)
 	return c.JSON(http.StatusOK, rooms)
@@ -292,6 +331,7 @@ func (app *App) handleCreateRoom(c echo.Context) error {
 	} else if err != nil {
 		return err
 	}
+	room.IsOwner = true
 	return c.JSON(http.StatusCreated, app.withOpen(room))
 }
 
@@ -327,7 +367,7 @@ func (app *App) handleDeleteRoom(c echo.Context) error {
 }
 
 func (app *App) handleFinishCall(c echo.Context) error {
-	room, err := app.ownerRoom(c)
+	room, err := app.staffRoom(c)
 	if err != nil {
 		return err
 	}
@@ -355,7 +395,7 @@ const manualOpenDuration = 100 * time.Minute
 // 先生が同時に開けるルームは1つだけ。ほかのルームが授業中なら 409 で、そのルームと待っている人数を返す。
 // replace: true なら、そのルームを終了してから開始する
 func (app *App) handleOpenRoom(c echo.Context) error {
-	room, err := app.ownerRoom(c)
+	room, err := app.staffRoom(c)
 	if err != nil {
 		return err
 	}
@@ -364,7 +404,8 @@ func (app *App) handleOpenRoom(c echo.Context) error {
 	}
 	_ = c.Bind(&in)
 	ctx := c.Request().Context()
-	rooms, err := app.store.ListRoomsByOwner(ctx, room.OwnerID)
+	// 自分が作ったルームと、招待されて担当しているルームのうち、ほかに授業中のものがないか
+	rooms, err := app.store.ListTeacherRooms(ctx, currentUser(c).ID)
 	if err != nil {
 		return err
 	}
@@ -408,7 +449,7 @@ func (app *App) handleOpenRoom(c echo.Context) error {
 
 // POST /api/rooms/:id/close 「授業を終了」。時間割上の授業中なら、その時限が終わるまで閉じたままにする
 func (app *App) handleCloseRoom(c echo.Context) error {
-	room, err := app.ownerRoom(c)
+	room, err := app.staffRoom(c)
 	if err != nil {
 		return err
 	}
@@ -437,7 +478,7 @@ func (app *App) closeRoom(ctx context.Context, room *Room) error {
 }
 
 func (app *App) handleAck(c echo.Context) error {
-	room, err := app.ownerRoom(c)
+	room, err := app.staffRoom(c)
 	if err != nil {
 		return err
 	}
@@ -446,7 +487,7 @@ func (app *App) handleAck(c echo.Context) error {
 }
 
 func (app *App) handleListMemos(c echo.Context) error {
-	room, err := app.ownerRoom(c)
+	room, err := app.staffRoom(c)
 	if err != nil {
 		return err
 	}
@@ -458,7 +499,7 @@ func (app *App) handleListMemos(c echo.Context) error {
 }
 
 func (app *App) handleMemoDates(c echo.Context) error {
-	room, err := app.ownerRoom(c)
+	room, err := app.staffRoom(c)
 	if err != nil {
 		return err
 	}
@@ -470,7 +511,7 @@ func (app *App) handleMemoDates(c echo.Context) error {
 }
 
 func (app *App) handleMemosCSV(c echo.Context) error {
-	room, err := app.ownerRoom(c)
+	room, err := app.staffRoom(c)
 	if err != nil {
 		return err
 	}
@@ -531,8 +572,12 @@ func (app *App) handleQueue(c echo.Context) error {
 		}
 	}
 	u := currentUser(c)
-	if room.OwnerID == u.ID {
-		// 先生には先頭2人まで
+	staff, err := app.isStaff(c.Request().Context(), room, u)
+	if err != nil {
+		return err
+	}
+	if staff {
+		// 先生(作った先生・招待された先生)には先頭2人まで
 		head := calls
 		if len(head) > 2 {
 			head = head[:2]
@@ -728,4 +773,117 @@ func (app *App) handlePushTest(c echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+// ---------- 担当の先生(招待) ----------
+
+type teacherView struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+// GET /api/rooms/:id/teachers ルームを作った先生と、招待された先生
+func (app *App) handleListRoomTeachers(c echo.Context) error {
+	room, err := app.staffRoom(c)
+	if err != nil {
+		return err
+	}
+	users, err := app.store.ListRoomTeachers(c.Request().Context(), room.ID)
+	if err != nil {
+		return err
+	}
+	teachers := make([]teacherView, 0, len(users))
+	for _, u := range users {
+		teachers = append(teachers, teacherView{u.ID, u.Name, u.Email})
+	}
+	return c.JSON(http.StatusOK, map[string]any{
+		"owner":    teacherView{room.Owner.ID, room.Owner.Name, room.Owner.Email},
+		"teachers": teachers,
+		"isOwner":  room.IsOwner,
+	})
+}
+
+// DELETE /api/rooms/:id/teachers/:userId 招待した先生を外す(作った先生)、または自分が担当から抜ける(招待された先生)
+func (app *App) handleRemoveRoomTeacher(c echo.Context) error {
+	room, err := app.staffRoom(c)
+	if err != nil {
+		return err
+	}
+	target := c.Param("userId")
+	if !room.IsOwner && target != currentUser(c).ID {
+		return echo.NewHTTPError(http.StatusForbidden, "ほかの先生を外せるのは、ルームを作った先生だけです")
+	}
+	if target == room.OwnerID {
+		return echo.NewHTTPError(http.StatusBadRequest, "ルームを作った先生は外せません")
+	}
+	if err := app.store.RemoveRoomTeacher(c.Request().Context(), room.ID, target); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// GET /api/rooms/:id/invite 先生を招待するリンクのトークン(なければ作る)。ルームを作った先生だけ
+func (app *App) handleGetInvite(c echo.Context) error {
+	room, err := app.ownerRoom(c)
+	if err != nil {
+		return err
+	}
+	token, err := app.store.InviteToken(c.Request().Context(), room)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]string{"token": token})
+}
+
+// POST /api/rooms/:id/invite/reset 招待リンクを作り直す(前のリンクは使えなくなる)
+func (app *App) handleResetInvite(c echo.Context) error {
+	room, err := app.ownerRoom(c)
+	if err != nil {
+		return err
+	}
+	token, err := app.store.ResetInviteToken(c.Request().Context(), room)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]string{"token": token})
+}
+
+const invalidInvite = "招待リンクが無効です。ルームの先生に新しいリンクをもらってください"
+
+// GET /api/invites/:token 招待リンクを開いたとき。どのルームへの招待か(担当になる前の確認用)
+func (app *App) handleShowInvite(c echo.Context) error {
+	ctx := c.Request().Context()
+	room, err := app.store.RoomByInviteToken(ctx, c.Param("token"))
+	if errors.Is(err, ErrNotFound) {
+		return echo.NewHTTPError(http.StatusNotFound, invalidInvite)
+	} else if err != nil {
+		return err
+	}
+	if currentUser(c).Role != "TEACHER" {
+		return echo.NewHTTPError(http.StatusForbidden, "先生を招待するリンクです。学生は授業の QR コードから参加してください")
+	}
+	joined, err := app.isStaff(ctx, room, currentUser(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, map[string]any{"room": app.withOpen(room), "joined": joined})
+}
+
+// POST /api/invites/:token 招待を受けて、このルームの担当になる(先生だけ)
+func (app *App) handleAcceptInvite(c echo.Context) error {
+	ctx := c.Request().Context()
+	room, err := app.store.RoomByInviteToken(ctx, c.Param("token"))
+	if errors.Is(err, ErrNotFound) {
+		return echo.NewHTTPError(http.StatusNotFound, invalidInvite)
+	} else if err != nil {
+		return err
+	}
+	u := currentUser(c)
+	if room.OwnerID != u.ID {
+		if err := app.store.AddRoomTeacher(ctx, room.ID, u.ID); err != nil {
+			return err
+		}
+	}
+	return c.JSON(http.StatusOK, app.withOpen(room))
 }

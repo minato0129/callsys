@@ -15,6 +15,8 @@ export interface Room {
   id: string
   ownerId: string
   ownerName: string
+  // 先生のとき: このルームを作った先生か(false なら招待されて担当している)
+  isOwner?: boolean
   subject: string
   className: string
   dayOfWeek: number
@@ -94,6 +96,14 @@ export const api = {
   // replace: ほかのルームが授業中なら、そちらを終了してから開始する
   openRoom: (roomId: string, replace = false) => request<Room>('POST', `/api/rooms/${roomId}/open`, { replace }),
   closeRoom: (roomId: string) => request<Room>('POST', `/api/rooms/${roomId}/close`),
+  // 担当の先生(招待)
+  roomTeachers: (roomId: string) => request<RoomTeachers>('GET', `/api/rooms/${roomId}/teachers`),
+  removeRoomTeacher: (roomId: string, userId: string) =>
+    request<void>('DELETE', `/api/rooms/${roomId}/teachers/${encodeURIComponent(userId)}`),
+  invite: (roomId: string) => request<{ token: string }>('GET', `/api/rooms/${roomId}/invite`),
+  resetInvite: (roomId: string) => request<{ token: string }>('POST', `/api/rooms/${roomId}/invite/reset`),
+  showInvite: (token: string) => request<{ room: Room; joined: boolean }>('GET', `/api/invites/${token}`),
+  acceptInvite: (token: string) => request<Room>('POST', `/api/invites/${token}`),
   memos: (roomId: string, date: string) =>
     request<Memo[]>('GET', `/api/rooms/${roomId}/memos?date=${encodeURIComponent(date)}`),
   memoDates: (roomId: string) => request<string[]>('GET', `/api/rooms/${roomId}/memo-dates`),
@@ -117,6 +127,10 @@ export const api = {
 
 export const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 export const CALL_LABEL: Record<CallType, string> = { QUESTION: '質問', CHECK: '課題チェック' }
+
+export interface TeacherInfo { id: string; name: string; email: string }
+// ルームを作った先生と、招待されて担当している先生
+export interface RoomTeachers { owner: TeacherInfo; teachers: TeacherInfo[]; isOwner: boolean }
 
 // 「授業を開始」したとき、ほかのルームが授業中(409)。先生が同時に開けるルームは1つだけ
 export interface OpenConflict { error: string; conflict: Room; waiting: number }

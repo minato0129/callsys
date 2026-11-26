@@ -369,12 +369,22 @@ func (n *Notifier) notifyTeacher(room *Room, head CallView) {
 	if head.Type == "CHECK" {
 		label = "課題チェック"
 	}
-	n.app.push.Send(room.OwnerID, Notification{
-		Title: room.Subject + " " + room.ClassName,
-		Body:  head.StudentName + "からの呼び出し(" + label + ")",
-		URL:   "/rooms/" + room.ID,
-		Kind:  "teacher-call",
-	})
+	// ルームを作った先生と、招待された先生の全員に送る
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ids, err := n.app.store.RoomStaffIDs(ctx, room)
+	if err != nil {
+		log.Printf("notifier: %v", err)
+		ids = []string{room.OwnerID}
+	}
+	for _, id := range ids {
+		n.app.push.Send(id, Notification{
+			Title: room.Subject + " " + room.ClassName,
+			Body:  head.StudentName + "からの呼び出し(" + label + ")",
+			URL:   "/rooms/" + room.ID,
+			Kind:  "teacher-call",
+		})
+	}
 }
 
 // 先生のアプリが前面に来たとき

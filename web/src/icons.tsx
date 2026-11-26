@@ -47,3 +47,7 @@ export const IconCheck = (p: P) => (
 export const IconLeave = (p: P) => (
   <svg {...base(p)}><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10" /></svg>
 )
+// 担当の先生(複数人)
+export const IconUsers = (p: P) => (
+  <svg {...base(p)}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.3c1.8.8 3 2.6 3 4.7v1" /></svg>
+)
