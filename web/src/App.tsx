@@ -9,6 +9,7 @@ import StudentRoom from './pages/StudentRoom'
 import Scan from './pages/Scan'
 import Join from './pages/Join'
 import Invite from './pages/Invite'
+import Guide from './pages/Guide'
 import Account from './pages/Account'
 import type { ReactNode } from 'react'
 
@@ -41,6 +42,7 @@ export default function App() {
       <Route path="/scan" element={<RequireLogin><Scan /></RequireLogin>} />
       <Route path="/join/:roomId" element={<RequireLogin><Join /></RequireLogin>} />
       <Route path="/invite/:token" element={<RequireLogin><Invite /></RequireLogin>} />
+      <Route path="/guide" element={<RequireLogin><Guide /></RequireLogin>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

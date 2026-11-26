@@ -479,6 +479,38 @@ textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
    ・下から出るシートを画面中央のダイアログに
    ・画面の下に固定していたボタンを、内容のすぐ下に
    ========================================================== */
+/* ---------- 使い方 ---------- */
+.guide { gap: 20px; }
+.guide-intro { display: flex; flex-direction: column; gap: 14px; padding: 18px; background: var(--board); color: #f3f5f2; border-radius: var(--radius-lg); }
+.guide-lead { font-size: 1.05rem; line-height: 1.7; }
+.guide-lead b { color: var(--chalk); }
+.guide-flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.guide-flow li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgb(255 255 255 / .1); border-radius: var(--radius-sm); font-weight: 700; font-size: .9rem; }
+.guide-flow span { flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--chalk); color: var(--chalk-ink); font-size: .8rem; font-weight: 900; }
+.guide-toc { display: flex; flex-wrap: wrap; gap: 8px; }
+.guide-toc button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); color: var(--ink); font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.guide-toc button span { color: var(--board); font-variant-numeric: tabular-nums; }
+.guide-section { display: flex; flex-direction: column; gap: 14px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); scroll-margin-top: 72px; }
+.guide-text { display: flex; flex-direction: column; gap: 10px; min-width: 0; line-height: 1.75; }
+.guide-text h2 { display: flex; align-items: center; gap: 10px; font-size: 1.15rem; font-weight: 900; }
+.guide-no { flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--board); color: #fff; font-size: .9rem; }
+.guide-steps, .guide-list { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
+.guide-list { list-style: disc; }
+.guide-note { padding: 10px 12px; border-left: 4px solid var(--chalk); background: color-mix(in srgb, var(--chalk) 16%, var(--surface)); border-radius: var(--radius-sm); font-size: .9rem; }
+.guide-question { color: var(--question-text); font-weight: 800; }
+.guide-check { color: var(--check-text); font-weight: 800; }
+.guide-img { align-self: center; width: min(260px, 72vw); height: auto; border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 6px 18px rgb(0 0 0 / .08); }
+.guide-faq { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.guide-faq dt { font-weight: 800; margin-top: 8px; }
+.guide-faq dt:first-child { margin-top: 0; }
+.guide-faq dd { margin: 0; color: var(--muted); }
+@media (min-width: 700px) {
+  .guide-flow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .guide-section.has-img { flex-direction: row; align-items: flex-start; gap: 24px; }
+  .guide-section.has-img .guide-text { flex: 1; }
+  .guide-img { flex: none; width: 240px; }
+}
+
 @media (min-width: 900px) {
   :root { --sidenav-w: 232px; }
 

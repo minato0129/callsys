@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useApp } from '../app-context'
 import { Header, InstallCard, LogoutButton, PushSettings, TabBar } from '../components'
 
@@ -22,6 +23,13 @@ export default function Account() {
           </div>
         </section>
         <PushSettings />
+        {teacher && (
+          <section className="group">
+            <div className="group-body">
+              <Link to="/guide" className="group-row action">使い方(できること・はじめかた)</Link>
+            </div>
+          </section>
+        )}
         <LogoutButton />
       </main>
       {teacher && <TabBar />}
