@@ -35,14 +35,28 @@ type Room struct {
 	OpenUntil   *time.Time `gorm:"type:datetime(3)" json:"openUntil"`   // 「授業を開始」で、この時刻まで開く
 	ClosedUntil *time.Time `gorm:"type:datetime(3)" json:"closedUntil"` // 「授業を終了」で、時間割の残りの時間も閉じる
 
-	// ルーム削除で受講登録・呼び出し・メモも消す
-	Enrollments []Enrollment `gorm:"constraint:OnDelete:CASCADE" json:"-"`
-	Calls       []Call       `gorm:"constraint:OnDelete:CASCADE" json:"-"`
-	Memos       []Memo       `gorm:"constraint:OnDelete:CASCADE" json:"-"`
+	// ほかの先生をこのルームの担当に招待するリンクのトークン。作り直すと前のリンクは使えなくなる
+	InviteToken *string `gorm:"size:32;uniqueIndex" json:"-"`
+
+	// ルーム削除で受講登録・担当の先生・呼び出し・メモも消す
+	Enrollments []Enrollment  `gorm:"constraint:OnDelete:CASCADE" json:"-"`
+	Teachers    []RoomTeacher `gorm:"constraint:OnDelete:CASCADE" json:"-"`
+	Calls       []Call        `gorm:"constraint:OnDelete:CASCADE" json:"-"`
+	Memos       []Memo        `gorm:"constraint:OnDelete:CASCADE" json:"-"`
 
 	// DB には保存しない、レスポンス用の項目
 	OwnerName string `gorm:"-" json:"ownerName"`
 	IsOpen    bool   `gorm:"-" json:"isOpen"`
+	IsOwner   bool   `gorm:"-" json:"isOwner"` // ログイン中の先生がこのルームを作った先生か(招待された先生は false)
+}
+
+// 招待されて、このルームを一緒に担当する先生(呼び出しへの対応・通知・メモ)。
+// ルームの変更・削除・招待は、ルームを作った先生だけができる
+type RoomTeacher struct {
+	RoomID    string    `gorm:"primaryKey;size:32"`
+	UserID    string    `gorm:"primaryKey;size:64;index"`
+	User      User      `gorm:"foreignKey:UserID"`
+	CreatedAt time.Time `gorm:"type:datetime(3)"`
 }
 
 // ルームの時間帯(曜日 + 開始〜終了の時限)
@@ -160,7 +174,7 @@ func weekdayOrder(dow int) int {
 	return dow
 }
 
-var allModels = []any{&User{}, &Room{}, &RoomSlot{}, &Enrollment{}, &Call{}, &Memo{}, &PushSubscription{}}
+var allModels = []any{&User{}, &Room{}, &RoomSlot{}, &Enrollment{}, &RoomTeacher{}, &Call{}, &Memo{}, &PushSubscription{}}
 
 // ---------- レスポンス用 ----------
 

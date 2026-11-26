@@ -32,7 +32,7 @@ export default function TeacherHome() {
               <Link key={r.id} to={`/rooms/${r.id}`} className="room-live">
                 <span className="room-live-label">授業中</span>
                 <span className="room-live-title">{r.subject}</span>
-                <span className="room-live-sub">{r.className}・{slotLabel(r)}</span>
+                <span className="room-live-sub">{r.className}・{slotLabel(r)}{r.isOwner === false && `・${r.ownerName} 先生のルーム`}</span>
               </Link>
             ))}
           </div>
@@ -46,7 +46,8 @@ export default function TeacherHome() {
                   <span className="slot">{slotLabels(r).map((l) => <span key={l}>{l}</span>)}</span>
                   <span className="list-main">
                     <span className="list-title">{r.subject}</span>
-                    <span className="list-sub">{r.className}</span>
+                    {/* 招待されて担当しているルームは、作った先生の名前も出す */}
+                    <span className="list-sub">{r.className}{r.isOwner === false && `・${r.ownerName} 先生のルーム`}</span>
                   </span>
                 </Link>
               </li>

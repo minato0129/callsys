@@ -4,7 +4,8 @@ import { QRCodeSVG } from 'qrcode.react'
 import { api, ApiError, CALL_LABEL, slotLabel, type Call, type OpenConflict, type Room, type TeacherQueue } from '../api'
 import { useNow, useRoomEvents } from '../app-context'
 import { elapsed, ErrorText, Header, IconButton, MenuSheet, PushBanner, Sheet, TabBar, TypeBadge } from '../components'
-import { IconClose, IconEdit, IconMore, IconQR, IconTrash } from '../icons'
+import { IconClose, IconEdit, IconMore, IconQR, IconTrash, IconUsers } from '../icons'
+import { RoomTeachersSheet } from './RoomTeachersSheet'
 import { RoomForm } from '../RoomForm'
 import { chime, onForegroundPush } from '../push'
 
@@ -29,7 +30,7 @@ export default function TeacherRoom() {
   const [queue, setQueue] = useState<TeacherQueue | null>(null)
   const [selected, setSelected] = useState<Call | null>(null)
   const [memo, setMemo] = useState('')
-  const [sheet, setSheet] = useState<'none' | 'menu' | 'edit' | 'qr' | 'open-conflict'>('none')
+  const [sheet, setSheet] = useState<'none' | 'menu' | 'edit' | 'qr' | 'open-conflict' | 'teachers'>('none')
   const [openConflict, setOpenConflict] = useState<OpenConflict | null>(null)
   const [switching, setSwitching] = useState(false)
   const [error, setError] = useState('')
@@ -112,7 +113,8 @@ export default function TeacherRoom() {
     <>
       <Header
         title={room?.subject ?? 'ルーム'}
-        sub={room ? `${room.className}・${slotLabel(room)}` : undefined}
+        // 招待されて担当しているルームは、作った先生の名前も出す
+        sub={room ? `${room.className}・${slotLabel(room)}${room.isOwner === false ? `・${room.ownerName} 先生のルーム` : ''}` : undefined}
         back="/"
         actions={<>
           <IconButton label="参加用の QR コード" onClick={() => setSheet('qr')}><IconQR /></IconButton>
@@ -221,12 +223,18 @@ export default function TeacherRoom() {
       )}
 
       {sheet === 'menu' && (
-        <MenuSheet onClose={closeSheet} items={[
+        // ルームの変更・削除・先生の招待は、ルームを作った先生だけ
+        <MenuSheet onClose={closeSheet} items={room?.isOwner === false ? [
           { label: '参加用の QR コードを表示', icon: <IconQR />, onSelect: () => setSheet('qr') },
+          { label: '担当の先生', icon: <IconUsers />, onSelect: () => setSheet('teachers') },
+        ] : [
+          { label: '参加用の QR コードを表示', icon: <IconQR />, onSelect: () => setSheet('qr') },
+          { label: '先生を招待', icon: <IconUsers />, onSelect: () => setSheet('teachers') },
           { label: 'ルームを変更', icon: <IconEdit />, onSelect: () => setSheet('edit') },
           { label: 'ルームを削除', icon: <IconTrash />, danger: true, onSelect: () => void deleteRoom() },
         ]} />
       )}
+      {sheet === 'teachers' && room && <RoomTeachersSheet room={room} onClose={closeSheet} />}
 
       {sheet === 'edit' && room && (
         <Sheet title="ルームを変更" onClose={closeSheet}>

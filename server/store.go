@@ -304,6 +304,79 @@ func (s *Store) Enroll(ctx context.Context, roomID, userID string) error {
 		Omit("User").Create(&Enrollment{RoomID: roomID, UserID: userID}).Error
 }
 
+// ---------- 担当の先生(招待) ----------
+
+// 先生のルーム: 自分で作ったルームと、招待されて担当しているルーム
+func (s *Store) ListTeacherRooms(ctx context.Context, userID string) ([]*Room, error) {
+	var rooms []Room
+	err := s.db.WithContext(ctx).Preload("Owner").Preload("Slots", preloadSlots).
+		Where("owner_id = ? OR id IN (SELECT room_id FROM room_teachers WHERE user_id = ?)", userID, userID).
+		Order("day_of_week, period").Find(&rooms).Error
+	return fillOwner(rooms), err
+}
+
+func (s *Store) IsRoomTeacher(ctx context.Context, roomID, userID string) (bool, error) {
+	var n int64
+	err := s.db.WithContext(ctx).Model(&RoomTeacher{}).Where("room_id = ? AND user_id = ?", roomID, userID).Count(&n).Error
+	return n > 0, err
+}
+
+func (s *Store) AddRoomTeacher(ctx context.Context, roomID, userID string) error {
+	return s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).
+		Omit("User").Create(&RoomTeacher{RoomID: roomID, UserID: userID}).Error
+}
+
+func (s *Store) RemoveRoomTeacher(ctx context.Context, roomID, userID string) error {
+	return s.db.WithContext(ctx).Where("room_id = ? AND user_id = ?", roomID, userID).Delete(&RoomTeacher{}).Error
+}
+
+// 招待された先生(招待された順)
+func (s *Store) ListRoomTeachers(ctx context.Context, roomID string) ([]User, error) {
+	var users []User
+	err := s.db.WithContext(ctx).Joins("JOIN room_teachers t ON t.user_id = users.id").
+		Where("t.room_id = ?", roomID).Order("t.created_at").Find(&users).Error
+	return users, err
+}
+
+// 通知を送る先生: ルームを作った先生と、招待された先生
+func (s *Store) RoomStaffIDs(ctx context.Context, r *Room) ([]string, error) {
+	var ids []string
+	if err := s.db.WithContext(ctx).Model(&RoomTeacher{}).Where("room_id = ?", r.ID).Pluck("user_id", &ids).Error; err != nil {
+		return nil, err
+	}
+	return append([]string{r.OwnerID}, ids...), nil
+}
+
+// 招待リンクのトークン。まだなければ作る
+func (s *Store) InviteToken(ctx context.Context, r *Room) (string, error) {
+	if r.InviteToken != nil && *r.InviteToken != "" {
+		return *r.InviteToken, nil
+	}
+	return s.ResetInviteToken(ctx, r)
+}
+
+// 招待リンクを作り直す(前のリンクは使えなくなる)
+func (s *Store) ResetInviteToken(ctx context.Context, r *Room) (string, error) {
+	token := newID() + newID()[:8]
+	if err := s.db.WithContext(ctx).Model(&Room{}).Where("id = ?", r.ID).Update("invite_token", token).Error; err != nil {
+		return "", err
+	}
+	r.InviteToken = &token
+	return token, nil
+}
+
+func (s *Store) RoomByInviteToken(ctx context.Context, token string) (*Room, error) {
+	var r Room
+	if token == "" {
+		return nil, ErrNotFound
+	}
+	if err := s.db.WithContext(ctx).Preload("Owner").Preload("Slots", preloadSlots).First(&r, "invite_token = ?", token).Error; err != nil {
+		return nil, notFound(err)
+	}
+	r.OwnerName = r.Owner.Name
+	return &r, nil
+}
+
 func (s *Store) IsEnrolled(ctx context.Context, roomID, userID string) (bool, error) {
 	var n int64
 	err := s.db.WithContext(ctx).Model(&Enrollment{}).
