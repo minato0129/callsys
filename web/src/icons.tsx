@@ -51,3 +51,7 @@ export const IconLeave = (p: P) => (
 export const IconUsers = (p: P) => (
   <svg {...base(p)}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.3c1.8.8 3 2.6 3 4.7v1" /></svg>
 )
+// 使い方(ヘルプ)
+export const IconHelp = (p: P) => (
+  <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" /></svg>
+)

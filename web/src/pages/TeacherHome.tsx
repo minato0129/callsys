@@ -4,7 +4,7 @@ import { api, slotLabel, slotLabels, type Room } from '../api'
 import { RoomForm } from '../RoomForm'
 import { useApp } from '../app-context'
 import { ErrorText, Header, IconButton, PushBanner, Sheet, TabBar } from '../components'
-import { IconPlus } from '../icons'
+import { IconHelp, IconPlus } from '../icons'
 
 export default function TeacherHome() {
   const { user } = useApp()
@@ -22,7 +22,10 @@ export default function TeacherHome() {
   return (
     <>
       <Header title="ルーム" sub={user ? `${user.name} 先生` : undefined}
-        actions={<IconButton label="ルームを作成" onClick={() => setCreating(true)}><IconPlus /></IconButton>} />
+        actions={<>
+          <Link to="/guide" className="icon-btn" aria-label="使い方" title="使い方"><IconHelp /></Link>
+          <IconButton label="ルームを作成" onClick={() => setCreating(true)}><IconPlus /></IconButton>
+        </>} />
       <main className="page page-wide stack with-tabbar">
         <PushBanner text="呼び出されたときに通知を受け取る" />
 
@@ -59,6 +62,7 @@ export default function TeacherHome() {
           <div className="empty">
             <p>授業ごとにルームを作ると、学生が QR コードから参加して呼び出せるようになります。</p>
             <button type="button" className="btn primary wide" onClick={() => setCreating(true)}>最初のルームを作成</button>
+            <Link to="/guide" className="btn wide">使い方を見る</Link>
           </div>
         )}
         <ErrorText error={error} />
